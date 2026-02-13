@@ -15,6 +15,10 @@ export class Vec2 {
         return new Vec2(this.x - other.x, this.y - other.y)
     }
 
+    mul(other: Vec2): Vec2 {
+        return new Vec2(this.x * other.x, this.y * other.y)
+    }
+
     scale(scalar: number): Vec2 {
         return new Vec2(this.x * scalar, this.y * scalar)
     }

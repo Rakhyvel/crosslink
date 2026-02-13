@@ -16,8 +16,6 @@ const canvas = document.createElement("canvas");
 document.body.style.margin = "0"
 document.body.appendChild(canvas);
 
-const ctx = canvas.getContext("2d")!;
-
 function resize() {
     canvas.width = window.innerWidth * 0.8
     canvas.height = window.innerHeight
@@ -26,15 +24,13 @@ window.addEventListener("resize", resize)
 resize()
 
 function frame(now: number) {
-    ctx.clearRect(0, 0, canvas.width, canvas.height)
-
     sim.update(now)
-    sim.draw(ctx)
+    sim.draw()
 
     requestAnimationFrame(frame)
 }
 
-const sim = new Sim(60)
+const sim = new Sim(canvas, 60)
 
 function getMousePos(e: MouseEvent): Vec2 {
     const rect = canvas.getBoundingClientRect()
@@ -82,7 +78,7 @@ canvas.addEventListener("mousedown", (e) => {
 
 window.addEventListener("mousemove", (e) => {
     const mouse = getMousePos(e)
-    sim.handleMouseMove(mouse)
+    sim.handleMouseMove(mouse, e)
     sim.handlePaletteMouseMove(mouse)
 })
 
