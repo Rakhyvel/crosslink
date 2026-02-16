@@ -22,4 +22,10 @@ export class Vec2 {
     scale(scalar: number): Vec2 {
         return new Vec2(this.x * scalar, this.y * scalar)
     }
+
+    snap(grid: number): Vec2 {
+        const snapX = Math.round(this.x / grid) * grid;
+        const snapY = Math.round(this.y / grid) * grid;
+        return new Vec2(snapX, snapY)
+    }
 }

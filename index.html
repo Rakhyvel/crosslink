@@ -6,26 +6,38 @@
     <title>crosslink</title>
   </head>
   <body>
-    <div id="app"></div>
-    <div id="palette">
-      <!-- data-type should be the actual class in ts -->
-      <div class="palette-item" data-type="Button">Button</div>
-      <div class="palette-item" data-type="Led">LED</div>
-      <div class="palette-item" data-type="Switch">Switch</div>
-      <div class="palette-item" data-type="NotGate">NOT Gate</div>
-      <div class="palette-item" data-type="AndGate">AND Gate</div>
-      <div class="palette-item" data-type="OrGate">OR Gate</div>
-      <div class="palette-item" data-type="XorGate">XOR Gate</div>
-      <div class="palette-item" data-type="NandGate">NAND Gate</div>
-      <div class="palette-item" data-type="NorGate">NOR Gate</div>
-      <div class="palette-item" data-type="XnorGate">XNOR Gate</div>
-      <div class="palette-item" data-type="Clock">Clock</div>
-      <div class="palette-item" data-type="DFlipFlop">D Flip-Flop</div>
-      <div class="palette-item" data-type="TFlipFlop">T Flip-Flop</div>
+    <div id="root">
+      <div id="topbar">
+        <button id="start">Start</button>
+        <button id="stop">Stop</button>
+        <button id="step">Step</button>
+        <button id="clear">Clear</button>
+      </div>
+
+      <div id="workspace">
+        <div id="palette">
+          <!-- data-type should be the actual class in ts -->
+          <div class="palette-item" data-type="Button">Button</div>
+          <div class="palette-item" data-type="Led">LED</div>
+          <div class="palette-item" data-type="Switch">Switch</div>
+          <div class="palette-item" data-type="NotGate">NOT Gate</div>
+          <div class="palette-item" data-type="AndGate">AND Gate</div>
+          <div class="palette-item" data-type="OrGate">OR Gate</div>
+          <div class="palette-item" data-type="XorGate">XOR Gate</div>
+          <div class="palette-item" data-type="NandGate">NAND Gate</div>
+          <div class="palette-item" data-type="NorGate">NOR Gate</div>
+          <div class="palette-item" data-type="XnorGate">XNOR Gate</div>
+          <div class="palette-item" data-type="Clock">Clock</div>
+          <div class="palette-item" data-type="DFlipFlop">D Flip-Flop</div>
+          <div class="palette-item" data-type="TFlipFlop">T Flip-Flop</div>
+        </div>
+
+        <div id="editor">
+          <canvas id="sim-canvas"></canvas>
+        </div>
+      </div>
     </div>
 
-    <div id="canvas-container">
-      <script type="module" src="/src/main.ts"></script>
-    </div>
+    <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

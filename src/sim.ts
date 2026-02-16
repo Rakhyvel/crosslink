@@ -1,6 +1,11 @@
 import { AndGate, Button, Led, NotGate, OrGate, Port, XorGate, PortKind, Wire, Switch, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable } from './components.ts'
 import { Vec2 } from './vec.ts'
 
+interface DraggingComponent {
+    component: Component
+    toPos: Vec2
+}
+
 interface DraggingWire {
     from: Port
     toPos: Vec2
@@ -12,17 +17,22 @@ interface DraggingPalette {
     toPos: Vec2
 }
 
+interface Pan {
+    fromPos: Vec2
+    toPos: Vec2
+}
+
 export class Sim {
     components: Component[] = []
     wires: Wire[] = []
 
-    draggingComponent: Component | null = null
+    draggingComponent: DraggingComponent | null = null
     draggingWire: DraggingWire | null = null
-    dragOffset: Vec2 = new Vec2(0, 0)
     draggingFromPalette: DraggingPalette | null = null
+    dragOffset: Pan | null = null
 
     cameraPos: Vec2 = new Vec2(0, 0)
-    cameraZoom: number = 1
+    cameraZoom: number = 1.0 / 1.1
 
     canvas: HTMLCanvasElement
     ctx: CanvasRenderingContext2D
@@ -44,9 +54,23 @@ export class Sim {
     }
 
     worldFromScreen(screen: Vec2): Vec2 {
-        const worldX = (screen.x - this.canvas.width / 2) / this.cameraZoom + this.canvas.width / 2
-        const worldY = (screen.y - this.canvas.height / 2) / this.cameraZoom + this.canvas.height / 2
+        const worldX = (screen.x - this.canvas.width / 2) / this.cameraZoom + this.canvas.width / 2 + this.cameraPos.x
+        const worldY = (screen.y - this.canvas.height / 2) / this.cameraZoom + this.canvas.height / 2 + this.cameraPos.y
         return new Vec2(worldX, worldY);
+    }
+
+    screenFromWorld(world: Vec2): Vec2 {
+        const screenX = (world.x - this.canvas.width / 2) * this.cameraZoom + this.canvas.width / 2
+        const screenY = (world.y - this.canvas.width / 2) * this.cameraZoom + this.canvas.width / 2
+        return new Vec2(screenX, screenY);
+    }
+
+    getOffset(): Vec2 {
+        let offset = this.cameraPos
+        if (this.dragOffset) {
+            offset = offset.add(this.dragOffset.fromPos.sub(this.dragOffset.toPos))
+        }
+        return offset
     }
 
     addComponent(c: Component) {
@@ -116,12 +140,14 @@ export class Sim {
 
     startComponentDrag(component: Component, mousePos: Vec2) {
         const worldPos = this.worldFromScreen(mousePos)
-        this.draggingComponent = component
-        this.dragOffset = worldPos.sub(component.pos)
+        this.draggingComponent = {
+            component: component,
+            toPos: worldPos.sub(component.pos)
+        }
 
         // Bring to front (or disallow overlapping somehow?)
-        this.components = this.components.filter(x => x !== this.draggingComponent);
-        this.components.push(this.draggingComponent);
+        this.components = this.components.filter(x => x !== this.draggingComponent?.component);
+        this.components.push(this.draggingComponent?.component);
     }
 
     startPaletteDrag(id: string, mousePos: Vec2) {
@@ -147,7 +173,7 @@ export class Sim {
                 const pos = p.getWorldPos()
                 const clickableRadius = 6
                 if (Math.abs(worldPos.x - pos.x) < clickableRadius && Math.abs(worldPos.y - pos.y) < clickableRadius) {
-                    this.startWireDrag(p, worldPos)
+                    this.startWireDrag(p, mousePos)
                     return // stop here
                 }
             }
@@ -158,10 +184,15 @@ export class Sim {
             if (worldPos.x >= c.pos.x && worldPos.x <= c.pos.x + c.size.x &&
                 worldPos.y >= c.pos.y && worldPos.y <= c.pos.y + c.size.y
             ) {
-                this.startComponentDrag(c, worldPos)
+                this.startComponentDrag(c, mousePos)
                 return
             }
         }
+
+        this.dragOffset = {
+            fromPos: worldPos,
+            toPos: worldPos
+        };
     }
 
     handleMouseMove(mousePos: Vec2) {
@@ -173,9 +204,12 @@ export class Sim {
         }
 
         if (this.draggingComponent) {
-            const grid = 20;
-            this.draggingComponent.pos.x = Math.round((worldPos.x - this.dragOffset.x) / grid) * grid;
-            this.draggingComponent.pos.y = Math.round((worldPos.y - this.dragOffset.y) / grid) * grid;
+            this.draggingComponent.component.pos = worldPos.sub(this.draggingComponent.toPos).snap(20)
+            return
+        }
+
+        if (this.dragOffset) {
+            this.dragOffset.toPos = worldPos;
         }
     }
 
@@ -218,15 +252,22 @@ export class Sim {
         }
 
         if (this.draggingComponent) {
-            if (worldPos.x < 0) {
-                this.removeComponent(this.draggingComponent)
+            if (mousePos.x < 0) {
+                this.removeComponent(this.draggingComponent.component)
             }
+            this.draggingComponent = null
+            return
         }
-        this.draggingComponent = null
+
+        if (this.dragOffset) {
+            this.cameraPos = this.cameraPos.add(this.dragOffset.fromPos.sub(this.dragOffset.toPos))
+            this.dragOffset = null
+            return
+        }
     }
 
     exitPaletteDrag(mousePos: Vec2) {
-        const worldPos = this.worldFromScreen(mousePos)
+        const worldPos = this.worldFromScreen(mousePos).snap(20)
         if (this.draggingFromPalette) {
             let comp: Component | null = null
             console.log(this.draggingFromPalette.id)
@@ -254,15 +295,22 @@ export class Sim {
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
         this.ctx.save()
-        this.ctx.translate(this.canvas.width / 2 + this.cameraPos.x, this.canvas.height / 2 - this.cameraPos.y)
+
+        const canvasVec = new Vec2(this.canvas.width, this.canvas.height).scale(0.5)
+        let offset = canvasVec.add(this.cameraPos)
+        if (this.dragOffset) {
+            offset = offset.add(this.dragOffset.fromPos.sub(this.dragOffset.toPos))
+        }
+
+        this.ctx.translate(canvasVec.x, canvasVec.y)
         this.ctx.scale(this.cameraZoom, this.cameraZoom)
-        this.ctx.translate(-this.canvas.width / 2 + this.cameraPos.x, -this.canvas.height / 2 - this.cameraPos.y)
+        this.ctx.translate(-offset.x, -offset.y)
 
         this.drawGrid()
 
-        this.ctx.fillStyle = "red"
-        const size = 10 // world units
-        this.ctx.fillRect(this.worldPos.x - size / 2, this.worldPos.y - size / 2, size, size)
+        // this.ctx.fillStyle = "red"
+        // const size = 10 // world units
+        // this.ctx.fillRect(this.worldPos.x - size / 2, this.worldPos.y - size / 2, size, size)
 
         for (const w of this.wires) {
             let color = w.from.value ? "#4caf50" : "#555"
@@ -292,6 +340,13 @@ export class Sim {
     drawGrid() {
         const width = this.canvas.width
         const height = this.canvas.height
+
+        this.ctx.fillStyle = "#f6f3ec"
+        this.ctx.beginPath();
+        this.ctx.roundRect(0, 0, width, height, 6);
+        this.ctx.fill();
+        this.ctx.stroke();
+
         const spacing = 20;
         this.ctx.strokeStyle = "rgba(0,0,0,0.05)";
         this.ctx.lineWidth = 1;
