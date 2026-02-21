@@ -12,11 +12,6 @@ interface DraggingWire {
     originalWire?: Wire
 }
 
-interface DraggingPalette {
-    id: string
-    toPos: Vec2
-}
-
 interface Pan {
     fromPos: Vec2
     toPos: Vec2
@@ -28,7 +23,6 @@ export class Sim {
 
     draggingComponent: DraggingComponent | null = null
     draggingWire: DraggingWire | null = null
-    draggingFromPalette: DraggingPalette | null = null
     dragOffset: Pan | null = null
 
     cameraPos: Vec2 = new Vec2(0, 0)
@@ -42,6 +36,11 @@ export class Sim {
 
     worldPos: Vec2 = new Vec2(0, 0)
 
+    private _enabled: boolean = false
+
+    pitch: number = 20
+    size: Vec2 = new Vec2(32, 26).scale(this.pitch)
+
     constructor(canvas: HTMLCanvasElement, tickMs: number) {
         this.canvas = canvas
         this.ctx = canvas.getContext("2d")!
@@ -54,15 +53,19 @@ export class Sim {
     }
 
     worldFromScreen(screen: Vec2): Vec2 {
-        const worldX = (screen.x - this.canvas.width / 2) / this.cameraZoom + this.canvas.width / 2 + this.cameraPos.x
-        const worldY = (screen.y - this.canvas.height / 2) / this.cameraZoom + this.canvas.height / 2 + this.cameraPos.y
+        const worldX = (screen.x - this.canvas.width / 2) / this.cameraZoom + this.size.x / 2 + this.cameraPos.x
+        const worldY = (screen.y - this.canvas.height / 2) / this.cameraZoom + this.size.y / 2 + this.cameraPos.y
         return new Vec2(worldX, worldY);
     }
 
     screenFromWorld(world: Vec2): Vec2 {
-        const screenX = (world.x - this.canvas.width / 2) * this.cameraZoom + this.canvas.width / 2
-        const screenY = (world.y - this.canvas.width / 2) * this.cameraZoom + this.canvas.width / 2
+        const screenX = (world.x - this.size.x / 2) * this.cameraZoom + this.canvas.width / 2
+        const screenY = (world.y - this.size.y / 2) * this.cameraZoom + this.canvas.height / 2
         return new Vec2(screenX, screenY);
+    }
+
+    pointInsideBoard(p: Vec2): boolean {
+        return (p.x >= 0 && p.x < this.size.x && p.y >= 0 && p.y < this.size.y)
     }
 
     getOffset(): Vec2 {
@@ -102,18 +105,56 @@ export class Sim {
 
     removeComponent(component: Component) {
         // Remove any wires
-        this.wires = this.wires.filter(w =>
-            w.from.parent !== component &&
-            w.to.parent !== component
-        )
+        for (const inputs of component.inputs) {
+            for (const w of inputs.wires) {
+                this.removeWire(w)
+            }
+        }
+        for (const outputs of component.outputs) {
+            for (const w of outputs.wires) {
+                this.removeWire(w)
+            }
+        }
 
         this.components = this.components.filter(x => x !== component)
     }
 
-    update(now: number) {
-        if (now - this.lastTick < this.tickMs) return
-        this.lastTick = now
+    clear() {
+        this.components = []
+        this.wires = []
+    }
 
+    set enabled(e: boolean) {
+        if (e) {
+            this.lastTick = Date.now()
+        }
+        this._enabled = e
+    }
+
+    get enabled(): boolean {
+        return this._enabled
+    }
+
+    updateIfEnabled() {
+        if (this.enabled) {
+            this.update()
+        }
+    }
+
+    private update() {
+        const now = Date.now()
+        const elapsed = now - this.lastTick
+
+        if (elapsed < this.tickMs) return
+
+        const missedTicks = Math.floor(elapsed / this.tickMs)
+        for (let i = 0; i < missedTicks; i++) {
+            this.step()
+            this.lastTick += this.tickMs
+        }
+    }
+
+    step() {
         for (const c of this.components) {
             c.update()
             for (const p of c.inputs) {
@@ -127,6 +168,7 @@ export class Sim {
     }
 
     startWireDrag(port: Port, mousePos: Vec2) {
+        if (this.enabled) return // can't do wires during a sim
         const worldPos = this.worldFromScreen(mousePos)
         if (port.kind === PortKind.Input) {
             if (port.wires.length === 0) return
@@ -139,7 +181,9 @@ export class Sim {
     }
 
     startComponentDrag(component: Component, mousePos: Vec2) {
+        if (this.enabled) return // can't drag components during a sim
         const worldPos = this.worldFromScreen(mousePos)
+        component.isDragged = true
         this.draggingComponent = {
             component: component,
             toPos: worldPos.sub(component.pos)
@@ -152,40 +196,72 @@ export class Sim {
 
     startPaletteDrag(id: string, mousePos: Vec2) {
         const worldPos = this.worldFromScreen(mousePos)
-        this.draggingFromPalette = { id, toPos: worldPos }
+
+        let comp: Component | null = null
+        switch (id) {
+            case "Button": comp = new Button(worldPos); break
+            case "NotGate": comp = new NotGate(worldPos); break
+            case "AndGate": comp = new AndGate(worldPos); break
+            case "OrGate": comp = new OrGate(worldPos); break
+            case "XorGate": comp = new XorGate(worldPos); break
+            case "NandGate": comp = new NandGate(worldPos); break
+            case "NorGate": comp = new NorGate(worldPos); break
+            case "XnorGate": comp = new XnorGate(worldPos); break
+            case "Led": comp = new Led(worldPos); break
+            case "Switch": comp = new Switch(worldPos); break
+            case "Clock": comp = new Clock(worldPos); break
+            case "DFlipFlop": comp = new DFlipFlop(worldPos); break
+            case "TFlipFlop": comp = new TFlipFlop(worldPos); break
+        }
+
+        if (comp) {
+            this.enabled = false
+            this.draggingComponent = {
+                component: comp,
+                toPos: comp.size.scale(0.5)
+            }
+            comp.isDragged = true
+            this.components.push(this.draggingComponent?.component);
+        }
     }
 
     handleMouseDown(mousePos: Vec2) {
         const worldPos = this.worldFromScreen(mousePos)
-        // check interactive components
-        for (const c of this.components) {
-            if ("onMouseDown" in c && "onMouseUp" in c && "contains" in c) {
-                const interactive = c as MouseInteractable
-                if (interactive.contains(worldPos)) {
-                    interactive.onMouseDown()
+        if (this.enabled) {
+            // if sim, check interactive components
+            for (const c of this.components) {
+                if ("onMouseDown" in c && "onMouseUp" in c && "contains" in c) {
+                    const interactive = c as MouseInteractable
+                    if (interactive.contains(worldPos)) {
+                        interactive.onMouseDown()
+                    }
                 }
             }
         }
 
         // Check if clicking on any port
-        for (const c of this.components) {
-            for (const p of [...c.inputs, ...c.outputs]) {
-                const pos = p.getWorldPos()
-                const clickableRadius = 6
-                if (Math.abs(worldPos.x - pos.x) < clickableRadius && Math.abs(worldPos.y - pos.y) < clickableRadius) {
-                    this.startWireDrag(p, mousePos)
-                    return // stop here
+        if (!this.enabled) {
+            for (const c of this.components) {
+                for (const p of [...c.inputs, ...c.outputs]) {
+                    const pos = p.getWorldPos()
+                    const clickableRadius = 6
+                    if (Math.abs(worldPos.x - pos.x) < clickableRadius && Math.abs(worldPos.y - pos.y) < clickableRadius) {
+                        this.startWireDrag(p, mousePos)
+                        return // stop here
+                    }
                 }
             }
         }
 
         // Check if clicking any component
-        for (const c of this.components) {
-            if (worldPos.x >= c.pos.x && worldPos.x <= c.pos.x + c.size.x &&
-                worldPos.y >= c.pos.y && worldPos.y <= c.pos.y + c.size.y
-            ) {
-                this.startComponentDrag(c, mousePos)
-                return
+        if (!this.enabled) {
+            for (const c of this.components) {
+                if (worldPos.x >= c.pos.x && worldPos.x <= c.pos.x + c.size.x &&
+                    worldPos.y >= c.pos.y && worldPos.y <= c.pos.y + c.size.y
+                ) {
+                    this.startComponentDrag(c, mousePos)
+                    return
+                }
             }
         }
 
@@ -210,13 +286,6 @@ export class Sim {
 
         if (this.dragOffset) {
             this.dragOffset.toPos = worldPos;
-        }
-    }
-
-    handlePaletteMouseMove(mousePos: Vec2) {
-        const worldPos = this.worldFromScreen(mousePos)
-        if (this.draggingFromPalette) {
-            this.draggingFromPalette.toPos = worldPos
         }
     }
 
@@ -252,9 +321,10 @@ export class Sim {
         }
 
         if (this.draggingComponent) {
-            if (mousePos.x < 0) {
+            if (!this.pointInsideBoard(worldPos)) {
                 this.removeComponent(this.draggingComponent.component)
             }
+            this.draggingComponent.component.isDragged = false
             this.draggingComponent = null
             return
         }
@@ -266,38 +336,13 @@ export class Sim {
         }
     }
 
-    exitPaletteDrag(mousePos: Vec2) {
-        const worldPos = this.worldFromScreen(mousePos).snap(20)
-        if (this.draggingFromPalette) {
-            let comp: Component | null = null
-            console.log(this.draggingFromPalette.id)
-            switch (this.draggingFromPalette.id) {
-                case "Button": comp = new Button(worldPos); break
-                case "NotGate": comp = new NotGate(worldPos); break
-                case "AndGate": comp = new AndGate(worldPos); break
-                case "OrGate": comp = new OrGate(worldPos); break
-                case "XorGate": comp = new XorGate(worldPos); break
-                case "NandGate": comp = new NandGate(worldPos); break
-                case "NorGate": comp = new NorGate(worldPos); break
-                case "XnorGate": comp = new XnorGate(worldPos); break
-                case "Led": comp = new Led(worldPos); break
-                case "Switch": comp = new Switch(worldPos); break
-                case "Clock": comp = new Clock(worldPos); break
-                case "DFlipFlop": comp = new DFlipFlop(worldPos); break
-                case "TFlipFlop": comp = new TFlipFlop(worldPos); break
-            }
-
-            if (comp) this.addComponent(comp)
-            this.draggingFromPalette = null
-        }
-    }
-
     draw() {
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height)
         this.ctx.save()
 
         const canvasVec = new Vec2(this.canvas.width, this.canvas.height).scale(0.5)
-        let offset = canvasVec.add(this.cameraPos)
+        const boardVec = new Vec2(this.size.x, this.size.y).scale(0.5)
+        let offset = boardVec.add(this.cameraPos)
         if (this.dragOffset) {
             offset = offset.add(this.dragOffset.fromPos.sub(this.dragOffset.toPos))
         }
@@ -312,17 +357,8 @@ export class Sim {
         // const size = 10 // world units
         // this.ctx.fillRect(this.worldPos.x - size / 2, this.worldPos.y - size / 2, size, size)
 
-        for (const w of this.wires) {
-            let color = w.from.value ? "#4caf50" : "#555"
-            this.drawWire(w.from.getWorldPos(), w.to.getWorldPos(), color)
-        }
-
-        if (this.draggingFromPalette) {
-            const pos = this.draggingFromPalette.toPos;
-            this.ctx.fillStyle = "#aaa8";
-            this.ctx.strokeStyle = "#75757588";
-            this.ctx.fillRect(pos.x, pos.y, 20, 40);
-            this.ctx.strokeRect(pos.x, pos.y, 20, 40);
+        for (const c of this.components) {
+            c.draw(this.ctx);
         }
 
         if (this.draggingWire) {
@@ -330,38 +366,35 @@ export class Sim {
             this.drawWire(this.draggingWire.from.getWorldPos(), this.draggingWire.toPos, color)
         }
 
-        for (const c of this.components) {
-            c.draw(this.ctx);
+        for (const w of this.wires) {
+            let color = w.from.value ? "#4caf50" : "#555"
+            this.drawWire(w.from.getWorldPos(), w.to.getWorldPos(), color)
         }
 
         this.ctx.restore()
     }
 
     drawGrid() {
-        const width = this.canvas.width
-        const height = this.canvas.height
-
         this.ctx.fillStyle = "#FDF6E3"
         this.ctx.beginPath();
-        this.ctx.roundRect(0, 0, width, height, 6);
+        this.ctx.roundRect(0, 0, this.size.x, this.size.y, 6);
         this.ctx.fill();
         this.ctx.stroke();
 
-        const spacing = 20;
         this.ctx.strokeStyle = "rgba(0,0,0,0.05)";
         this.ctx.lineWidth = 1;
 
-        for (let x = 0; x < width; x += spacing) {
+        for (let x = 0; x < this.size.x; x += this.pitch) {
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, height);
+            this.ctx.lineTo(x, this.size.y);
             this.ctx.stroke();
         }
 
-        for (let y = 0; y < height; y += spacing) {
+        for (let y = 0; y < this.size.y; y += this.pitch) {
             this.ctx.beginPath();
             this.ctx.moveTo(0, y);
-            this.ctx.lineTo(width, y);
+            this.ctx.lineTo(this.size.x, y);
             this.ctx.stroke();
         }
     }

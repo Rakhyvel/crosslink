@@ -7,6 +7,8 @@ export interface Component {
     inputs: Port[]
     outputs: Port[]
 
+    isDragged: boolean
+
     update(): void
     draw(ctx: CanvasRenderingContext2D): void
 }
@@ -50,6 +52,7 @@ export abstract class Gate implements Component {
     size: Vec2
     inputs: Port[] = []
     outputs: Port[] = []
+    isDragged: boolean = false
 
     constructor(pos: Vec2, inputNames: string[], outputNames: string[], width = 60) {
         this.pos = pos
@@ -69,9 +72,11 @@ export abstract class Gate implements Component {
     }
 
     draw(ctx: CanvasRenderingContext2D) {
+        const opacity = this.isDragged ? "88" : "ff"
+
         // Draw box
-        ctx.fillStyle = "#fcfbf8";
-        ctx.strokeStyle = "#4b4b4b";
+        ctx.fillStyle = "#fcfbf8" + opacity;
+        ctx.strokeStyle = "#4b4b4b" + opacity;
         ctx.lineWidth = 1.25;
 
         ctx.beginPath();
@@ -80,23 +85,26 @@ export abstract class Gate implements Component {
         ctx.stroke();
 
         // Draw label
-        ctx.fillStyle = "#222";
+        ctx.fillStyle = "#222222" + opacity;
         ctx.font = "12px system-ui, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(this.getLabel(), this.pos.x + this.size.x / 2, this.pos.y + this.size.y / 2);
 
         // Draw ports
-        const r = 4;
+        const size = 3;
         for (const p of [...this.inputs, ...this.outputs]) {
             const world = p.getWorldPos();
             ctx.beginPath();
-            ctx.arc(world.x, world.y, r, 0, Math.PI * 2);
+            ctx.arc(world.x, world.y, size, 0, Math.PI * 2)
+
+            ctx.fillStyle = "#0000"
+            ctx.strokeStyle = "#555"
             if (p.wires.length > 0) {
-                ctx.fillStyle = p.value === 1 ? "#4caf50" : "#555";
+                ctx.fillStyle = p.value === 1 ? ("#4caf50" + opacity) : ("#555555" + opacity);
+                ctx.strokeStyle = p.value === 1 ? ("#4caf50" + opacity) : ("#555555" + opacity);
                 ctx.fill();
             }
-            ctx.strokeStyle = "#555";
             // TODO: If port is hovered:
             // ctx.strokeStyle = "#4aa3ff";
             // ctx.lineWidth = 2;

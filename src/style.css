@@ -2,8 +2,8 @@
   --bg-main: #1e1e1e;
   --bg-sidebar: #181818;
   --bg-editor: #1F1F1F;
-  --bg-hover: #2a2d2e;
-  --accent: #3794ff;
+  --bg-hover: #2D2E2E;
+  --accent: #2D2E2E;
   --border: #2B2B2B;
   --text: #cccccc;
   --font: "Segoe UI", system-ui, sans-serif;
@@ -49,6 +49,23 @@ body {
 #topbar button:hover {
   background: var(--bg-hover);
   border-color: var(--accent);
+}
+
+#topbar button:disabled {
+  background-color: var(--bg-sidebar);
+  /* darker / less active than normal */
+  color: #666666;
+  /* dimmed text */
+  border-color: var(--border);
+  cursor: not-allowed;
+  opacity: 0.6;
+  /* subtle fade */
+}
+
+/* Remove hover glow on disabled buttons */
+#topbar button:disabled:hover {
+  background-color: var(--bg-sidebar);
+  border-color: var(--border);
 }
 
 /* WORKSPACE */
