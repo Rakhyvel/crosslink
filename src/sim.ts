@@ -341,7 +341,7 @@ export class Sim {
         const width = this.canvas.width
         const height = this.canvas.height
 
-        this.ctx.fillStyle = "#f6f3ec"
+        this.ctx.fillStyle = "#FDF6E3"
         this.ctx.beginPath();
         this.ctx.roundRect(0, 0, width, height, 6);
         this.ctx.fill();
