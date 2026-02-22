@@ -1,6 +1,6 @@
 import { AndGate, Button, Led, NotGate, OrGate, Port, XorGate, PortKind, Wire, Switch, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable } from './components.ts'
 import { Vec2 } from './vec.ts'
-import { AddComponentCommand, History } from './command.ts'
+import { AddComponentsCommand, History } from './command.ts'
 
 interface DraggingComponent {
     fromPos: Vec2
@@ -104,10 +104,12 @@ export class Sim {
         return offset
     }
 
-    addComponent(c: Component) {
+    addComponents(cs: Component[]) {
         this.deselect()
-        this.select(c)
-        this.components.push(c)
+        for (const c of cs) {
+            this.select(c)
+            this.components.push(c)
+        }
     }
 
     addWire(w: Wire) {
@@ -146,6 +148,12 @@ export class Sim {
             }
         }
         return retval
+    }
+
+    removeComponents(components: Component[]) {
+        for (const c of components) {
+            this.removeComponent(c)
+        }
     }
 
     removeComponent(component: Component) {
@@ -319,22 +327,21 @@ export class Sim {
     }
 
     paste(text: string) {
-        this.deselect()
         const data: ClipboardData = JSON.parse(text);
 
         // Instantiate components and map old IDs -> new instances
         const idMap = new Map<string, Component>();
+        const components = new Array<Component>();
         for (const c of data.components) {
             const instance: Component | null = this.createComponentFromType(c.type, new Vec2(c.position.x, c.position.y));
             if (!instance) {
                 throw "bad id: " + c.type
             }
 
-            this.select(instance)
-
             idMap.set(c.id, instance);
-            this.components.push(instance)
+            components.push(instance)
         }
+        this.history.execute(new AddComponentsCommand(components), this)
 
         // Instantiate wires
         for (const w of data.wires) {
@@ -400,12 +407,10 @@ export class Sim {
         let comp: Component | null = this.createComponentFromType(id, this.worldPos)
 
         if (comp) {
-            this.deselect()
             this.enabled = false
             this.componentDragFrom = this.worldPos.add(comp.size.scale(0.5))
             comp.isDragged = true
-            this.select(comp)
-            this.history.execute(new AddComponentCommand(comp), this)
+            this.history.execute(new AddComponentsCommand([comp]), this)
         }
     }
 

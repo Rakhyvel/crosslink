@@ -32,15 +32,15 @@ export class History {
     }
 }
 
-export class AddComponentCommand implements Command {
-    constructor(private component: Component) { }
+export class AddComponentsCommand implements Command {
+    constructor(private components: Component[]) { }
 
     do(sim: Sim) {
-        sim.addComponent(this.component)
+        sim.addComponents(this.components)
     }
 
     undo(sim: Sim) {
-        sim.removeComponent(this.component)
+        sim.removeComponents(this.components)
     }
 }
 
