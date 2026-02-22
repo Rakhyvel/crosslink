@@ -1,6 +1,6 @@
 import { AndGate, Button, Led, NotGate, OrGate, Port, XorGate, PortKind, Wire, Switch, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable } from './components.ts'
 import { Vec2 } from './vec.ts'
-import { AddComponentsCommand, History, RemoveComponentsCommand } from './command.ts'
+import { AddComponentsCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand } from './command.ts'
 
 interface DraggingComponent {
     fromPos: Vec2
@@ -337,6 +337,7 @@ export class Sim {
             }
 
             idMap.set(c.id, instance);
+            instance.dropped = true;
             components.push(instance)
         }
         this.history.execute(new AddComponentsCommand(components), this)
@@ -357,12 +358,10 @@ export class Sim {
 
     undo() {
         this.history.undo(this)
-        console.log(this.wires.length)
     }
 
     redo() {
         this.history.redo(this)
-        console.log(this.wires.length)
     }
 
     createComponentFromType(type: string, pos: Vec2) {
@@ -522,17 +521,22 @@ export class Sim {
         }
 
         if (this.componentDragFrom) {
-            const removedComponents = []
+            const cmds = []
             for (let c of this.selected) {
                 const dropPoint = c.pos.add(c.dragOffset!).snap(20)
                 if (!this.pointInsideBoard(dropPoint)) {
-                    removedComponents.push(c)
+                    cmds.push(new RemoveComponentsCommand([c]))
+                } else if (c.dropped) {
+                    cmds.push(new MoveComponentsCommand([c], [c.pos], [dropPoint]))
                 } else {
                     c.pos = dropPoint
+                    c.dropped = true
                 }
                 c.dragOffset = null
             }
-            this.history.execute(new RemoveComponentsCommand(removedComponents), this)
+            if (cmds.length > 0) {
+                this.history.execute(new CompositeCommand(cmds), this)
+            }
             this.componentDragFrom = null
             return
         }

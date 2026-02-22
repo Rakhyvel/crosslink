@@ -32,6 +32,18 @@ export class History {
     }
 }
 
+export class CompositeCommand implements Command {
+    constructor(private commands: Command[]) { }
+
+    do(sim: Sim) {
+        for (const c of this.commands) c.do(sim)
+    }
+
+    undo(sim: Sim) {
+        for (const c of this.commands) c.undo(sim)
+    }
+}
+
 export class AddComponentsCommand implements Command {
     private removedWires: Wire[] = []
 
@@ -39,7 +51,6 @@ export class AddComponentsCommand implements Command {
 
     do(sim: Sim) {
         sim.addComponents(this.components)
-        console.log(this.removedWires)
         for (const w of this.removedWires) {
             sim.addWire(w)
         }
@@ -69,7 +80,6 @@ export class RemoveComponentsCommand implements Command {
 
     undo(sim: Sim) {
         sim.addComponents(this.components)
-        console.log(this.removedWires)
         for (const w of this.removedWires) {
             sim.addWire(w)
         }

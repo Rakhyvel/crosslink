@@ -9,6 +9,7 @@ export interface Component {
 
     dragOffset: Vec2 | null
     selected: boolean
+    dropped: boolean
 
     id: string
 
@@ -59,6 +60,7 @@ export abstract class Gate implements Component {
     inputs: Port[] = []
     outputs: Port[] = []
     dragOffset: Vec2 | null = null
+    dropped: boolean = false
     selected: boolean = false
     id: string
 
