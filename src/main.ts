@@ -86,6 +86,10 @@ window.addEventListener("keydown", async (e: KeyboardEvent) => {
             }
         } else if (e.key.toLowerCase() == "a") {
             sim.selectAll()
+        } else if (e.key.toLowerCase() == "z") {
+            sim.undo()
+        } else if (e.key.toLowerCase() == "y") {
+            sim.redo()
         }
     } else if (e.key === "Backspace" || e.key === "Delete") {
         e.preventDefault()

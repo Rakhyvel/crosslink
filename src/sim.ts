@@ -1,5 +1,6 @@
 import { AndGate, Button, Led, NotGate, OrGate, Port, XorGate, PortKind, Wire, Switch, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable } from './components.ts'
 import { Vec2 } from './vec.ts'
+import { AddComponentCommand, History } from './command.ts'
 
 interface DraggingComponent {
     fromPos: Vec2
@@ -66,6 +67,8 @@ export class Sim {
 
     selected: Component[] = []
 
+    history: History = new History()
+
     constructor(canvas: HTMLCanvasElement, tickMs: number) {
         this.canvas = canvas
         this.ctx = canvas.getContext("2d")!
@@ -102,6 +105,8 @@ export class Sim {
     }
 
     addComponent(c: Component) {
+        this.deselect()
+        this.select(c)
         this.components.push(c)
     }
 
@@ -126,6 +131,21 @@ export class Sim {
 
     removeWireAttachedFrom(port: Port) {
         this.wires = this.wires.filter(w => w.from !== port && w.to !== port)
+    }
+
+    getWiresForComponent(component: Component) {
+        const retval: Wire[] = []
+        for (const inputs of component.inputs) {
+            for (const w of inputs.wires) {
+                retval.push(w)
+            }
+        }
+        for (const outputs of component.outputs) {
+            for (const w of outputs.wires) {
+                retval.push(w)
+            }
+        }
+        return retval
     }
 
     removeComponent(component: Component) {
@@ -330,6 +350,14 @@ export class Sim {
         }
     }
 
+    undo() {
+        this.history.undo(this)
+    }
+
+    redo() {
+        this.history.redo(this)
+    }
+
     createComponentFromType(type: string, pos: Vec2) {
         switch (type) {
             case "Button": return new Button(pos)
@@ -377,7 +405,7 @@ export class Sim {
             this.componentDragFrom = this.worldPos.add(comp.size.scale(0.5))
             comp.isDragged = true
             this.select(comp)
-            this.components.push(comp);
+            this.history.execute(new AddComponentCommand(comp), this)
         }
     }
 

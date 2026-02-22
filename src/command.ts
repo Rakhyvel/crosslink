@@ -1,0 +1,95 @@
+import type { Component, Wire } from "./components"
+import { Sim } from "./sim"
+import type { Vec2 } from "./vec"
+
+interface Command {
+    do(sim: Sim): void
+    undo(sim: Sim): void
+}
+
+export class History {
+    private undoStack: Command[] = []
+    private redoStack: Command[] = []
+
+    execute(cmd: Command, sim: Sim) {
+        cmd.do(sim)
+        this.undoStack.push(cmd)
+        this.redoStack = []
+    }
+
+    undo(sim: Sim) {
+        const cmd = this.undoStack.pop()
+        if (!cmd) return
+        cmd.undo(sim)
+        this.redoStack.push(cmd)
+    }
+
+    redo(sim: Sim) {
+        const cmd = this.redoStack.pop()
+        if (!cmd) return
+        cmd.do(sim)
+        this.undoStack.push(cmd)
+    }
+}
+
+export class AddComponentCommand implements Command {
+    constructor(private component: Component) { }
+
+    do(sim: Sim) {
+        sim.addComponent(this.component)
+    }
+
+    undo(sim: Sim) {
+        sim.removeComponent(this.component)
+    }
+}
+
+export class RemoveComponentCommand implements Command {
+    private removedWires: Wire[] = []
+
+    constructor(private component: Component) { }
+
+    do(sim: Sim) {
+        this.removedWires = sim.getWiresForComponent(this.component)
+        sim.removeComponent(this.component)
+    }
+
+    undo(sim: Sim) {
+        sim.addComponent(this.component)
+        for (const w of this.removedWires) {
+            sim.addWire(w)
+        }
+    }
+}
+
+export class MoveComponentCommand implements Command {
+    constructor(
+        private components: Component[],
+        private from: Vec2[],
+        private to: Vec2[]
+    ) { }
+
+    do(_sim: Sim) {
+        this.components.forEach((c, i) => {
+            c.pos = this.to[i]
+        })
+    }
+
+    undo(_sim: Sim) {
+        this.components.forEach((c, i) => {
+            c.pos = this.from[i]
+        })
+    }
+}
+
+export class AddWireCommand implements Command {
+    constructor(private wire: Wire) { }
+
+    do(sim: Sim) {
+        sim.addWire(this.wire)
+    }
+
+    undo(sim: Sim) {
+        sim.removeWire(this.wire)
+    }
+}
