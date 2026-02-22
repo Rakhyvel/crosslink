@@ -112,7 +112,7 @@ body {
 }
 
 #sim-canvas.running {
-  box-shadow: inset 0 0 30px rgba(0, 255, 0, 0.3);
+  box-shadow: inset 0 0 30px #4caf504c;
   transition: box-shadow 0.3s ease;
 }
 
