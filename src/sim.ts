@@ -157,6 +157,7 @@ export class Sim {
     }
 
     select(component: Component) {
+        if (this.enabled) return
         component.selected = true
         this.selected.push(component)
     }
@@ -368,6 +369,18 @@ export class Sim {
         }
     }
 
+    selectSingleComponent() {
+        this.deselect()
+        for (const c of this.components) {
+            if (this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
+                this.worldPos.y >= c.pos.y && this.worldPos.y <= c.pos.y + c.size.y
+            ) {
+                this.select(c)
+                return
+            }
+        }
+    }
+
     handleMouseDown(e: MouseEvent) {
         this.mouseDown = true;
         this.mouseDownWorldPos = new Vec2(this.worldPos.x, this.worldPos.y)
@@ -386,32 +399,19 @@ export class Sim {
 
         // Check if clicking on any port
         if (!this.enabled) {
-            for (const c of this.components) {
-                for (const p of [...c.inputs, ...c.outputs]) {
-                    const pos = p.getWorldPos()
-                    const clickableRadius = 6
-                    if (Math.abs(this.worldPos.x - pos.x) < clickableRadius && Math.abs(this.worldPos.y - pos.y) < clickableRadius) {
-                        this.startWireDrag(p)
-                        return // stop here
-                    }
-                }
+            const port = this.hitTestPorts(this.worldPos)
+            if (port) {
+                this.startWireDrag(port)
+                return
             }
         }
 
-        if (e.shiftKey) {
+        if (!this.enabled && e.shiftKey) {
             this.selection = { start: this.worldPos, end: this.worldPos }
         }
 
         if (!this.mouseInsideSelected()) {
-            this.deselect()
-            for (const c of this.components) {
-                if (this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
-                    this.worldPos.y >= c.pos.y && this.worldPos.y <= c.pos.y + c.size.y
-                ) {
-                    this.select(c)
-                    return
-                }
-            }
+            this.selectSingleComponent()
         }
     }
 
@@ -459,24 +459,16 @@ export class Sim {
         this.mouseDown = false
         if (this.draggingWire) {
             const from = this.draggingWire.from;
-            for (const c of this.components) {
-                for (const p of [...c.inputs, ...c.outputs]) {
-                    if (p == from) continue // skip self
-                    const pos = p.getWorldPos()
-                    const clickableRadius = 6
+            const port = this.hitTestPorts(this.worldPos)
+            if (port && from.kind !== port.kind) {
 
-                    if (Math.abs(this.worldPos.x - pos.x) < clickableRadius && Math.abs(this.worldPos.y - pos.y) < clickableRadius) {
-                        if (from.kind === p.kind) break
+                const output = from.kind === PortKind.Output ? from : port
+                const input = from.kind === PortKind.Input ? from : port
 
-                        const output = from.kind === PortKind.Output ? from : p
-                        const input = from.kind === PortKind.Input ? from : p
-
-                        const wire = new Wire(output, input)
-                        this.addWire(wire)
-                        this.draggingWire = null
-                        return
-                    }
-                }
+                const wire = new Wire(output, input)
+                this.addWire(wire)
+                this.draggingWire = null
+                return
             }
 
             if (this.draggingWire.originalWire) {
@@ -489,7 +481,7 @@ export class Sim {
             for (let c of this.selected) {
                 c.pos = c.pos.snap(20)
 
-                if (!this.pointInsideBoard(this.worldPos)) {
+                if (!this.pointInsideBoard(c.pos)) {
                     this.removeComponent(c)
                 }
                 c.isDragged = false
@@ -509,17 +501,7 @@ export class Sim {
             return
         }
 
-        if (!this.enabled) {
-            this.deselect()
-            for (const c of this.components) {
-                if (this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
-                    this.worldPos.y >= c.pos.y && this.worldPos.y <= c.pos.y + c.size.y
-                ) {
-                    this.select(c)
-                    return
-                }
-            }
-        }
+        this.selectSingleComponent()
     }
 
     private finishSelection() {
