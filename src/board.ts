@@ -194,28 +194,23 @@ export class Board {
     }
 
     drawWire(ctx: CanvasRenderingContext2D, fromPos: Vec2, toPos: Vec2, color: string) {
-        const padding = 10
-        const detour1 = fromPos.add(new Vec2(padding, 0))
-        const m = fromPos.add(toPos).scale(0.5)
-        const detour2 = toPos.sub(new Vec2(padding, 0))
+        const dx = toPos.x - fromPos.x;
+        const offset = Math.min(40, Math.abs(dx));
 
-        ctx.lineWidth = 1;
-        ctx.strokeStyle = color // 
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = color;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
 
         ctx.beginPath();
         ctx.moveTo(fromPos.x, fromPos.y);
-        ctx.lineTo(detour1.x, fromPos.y);
-        if (toPos.x >= fromPos.x + 2 * padding) {
-            ctx.lineTo(m.x, fromPos.y);
-            ctx.lineTo(m.x, toPos.y);
-        } else {
-            ctx.lineTo(detour1.x, m.y);
-            ctx.lineTo(detour2.x, m.y);
-        }
-        ctx.lineTo(detour2.x, toPos.y);
-        ctx.lineTo(toPos.x, toPos.y);
+
+        ctx.bezierCurveTo(
+            fromPos.x + offset, fromPos.y,       // control point 1
+            toPos.x - offset, toPos.y,           // control point 2
+            toPos.x, toPos.y                     // end point
+        );
+
         ctx.stroke();
     }
 }
