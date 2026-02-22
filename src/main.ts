@@ -52,9 +52,8 @@ function getMousePos(e: MouseEvent): Vec2 {
     )
 }
 
-canvas.addEventListener("mousedown", (e) => {
-    const mouse = getMousePos(e)
-    sim.handleMouseDown(mouse)
+canvas.addEventListener("mousedown", e => {
+    sim.handleMouseDown(e)
 })
 
 window.addEventListener("mousemove", (e) => {
@@ -62,9 +61,8 @@ window.addEventListener("mousemove", (e) => {
     sim.handleMouseMove(mouse)
 })
 
-window.addEventListener("mouseup", (e) => {
-    const mouse = getMousePos(e)
-    sim.handleMouseUp(mouse)
+window.addEventListener("mouseup", _ => {
+    sim.handleMouseUp()
 
     for (const c of sim.components) {
         if ("onMouseDown" in c && "onMouseUp" in c && "contains" in c) {
@@ -74,10 +72,25 @@ window.addEventListener("mouseup", (e) => {
     }
 })
 
+window.addEventListener("keydown", async (e: KeyboardEvent) => {
+    if (e.ctrlKey) {
+        e.preventDefault();
+        if (e.key.toLowerCase() === "c") {
+            await sim.copySelected();
+        } else if (e.key.toLowerCase() === "v") {
+            try {
+                const text = await navigator.clipboard.readText();
+                sim.paste(text);
+            } catch (err) {
+                console.warn("Clipboard does not contain valid circuit data", err);
+            }
+        }
+    }
+});
+
 document.querySelectorAll(".palette-item").forEach(el => {
-    el.addEventListener("mousedown", e => {
-        const mouse = getMousePos(e as MouseEvent)
-        sim.startPaletteDrag((el as HTMLElement).dataset.type!, mouse)
+    el.addEventListener("mousedown", _ => {
+        sim.startPaletteDrag((el as HTMLElement).dataset.type!)
     })
 })
 

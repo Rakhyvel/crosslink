@@ -2,7 +2,7 @@ import { AndGate, Button, Led, NotGate, OrGate, Port, XorGate, PortKind, Wire, S
 import { Vec2 } from './vec.ts'
 
 interface DraggingComponent {
-    component: Component
+    fromPos: Vec2
     toPos: Vec2
 }
 
@@ -17,16 +17,44 @@ interface Pan {
     toPos: Vec2
 }
 
+interface Selection {
+    start: Vec2
+    end: Vec2
+}
+
+type ClipboardData = {
+    components: {
+        id: string
+        type: string
+        position: { x: number, y: number }
+    }[]
+    wires: {
+        fromComponentId: string
+        fromPortIndex: number
+        toComponentId: string
+        toPortIndex: number
+    }[]
+}
+
+type DragState =
+    | { type: "none" }
+    | { type: "component"; components: Component[]; startPos: Vec2 }
+    | { type: "wire"; from: Port; originalWire?: Wire }
+    | { type: "selection"; start: Vec2; end: Vec2 }
+    | { type: "camera"; from: Vec2; to: Vec2 }
+
 export class Sim {
     components: Component[] = []
     wires: Wire[] = []
 
     draggingComponent: DraggingComponent | null = null
+    componentDragFrom: Vec2 | null = null
     draggingWire: DraggingWire | null = null
     dragOffset: Pan | null = null
+    selection: Selection | null = null
 
     cameraPos: Vec2 = new Vec2(0, 0)
-    cameraZoom: number = 1.0 / 1.1
+    cameraZoom: number = 1.5
 
     canvas: HTMLCanvasElement
     ctx: CanvasRenderingContext2D
@@ -35,11 +63,15 @@ export class Sim {
     private lastTick = 0
 
     worldPos: Vec2 = new Vec2(0, 0)
+    mouseDown: boolean = false
+    mouseDownWorldPos: Vec2 = new Vec2(0, 0)
 
     private _enabled: boolean = false
 
     pitch: number = 20
     size: Vec2 = new Vec2(32, 26).scale(this.pitch)
+
+    selected: Component[] = []
 
     constructor(canvas: HTMLCanvasElement, tickMs: number) {
         this.canvas = canvas
@@ -124,9 +156,22 @@ export class Sim {
         this.wires = []
     }
 
+    select(component: Component) {
+        component.selected = true
+        this.selected.push(component)
+    }
+
+    deselect() {
+        for (const c of this.selected) {
+            c.selected = false
+        }
+        this.selected = []
+    }
+
     set enabled(e: boolean) {
         if (e) {
             this.lastTick = Date.now()
+            this.deselect()
         }
         this._enabled = e
     }
@@ -167,72 +212,172 @@ export class Sim {
         }
     }
 
-    startWireDrag(port: Port, mousePos: Vec2) {
+    hitTestComponents(pos: Vec2): Component | null {
+        return this.components.find(c =>
+            pos.x >= c.pos.x && pos.x <= c.pos.x + c.size.x &&
+            pos.y >= c.pos.y && pos.y <= c.pos.y + c.size.y
+        ) ?? null
+    }
+
+    hitTestPorts(pos: Vec2, radius = 6): Port | null {
+        for (const c of this.components) {
+            for (const p of [...c.inputs, ...c.outputs]) {
+                const world = p.getWorldPos()
+                if (Math.abs(pos.x - world.x) < radius &&
+                    Math.abs(pos.y - world.y) < radius) return p
+            }
+        }
+        return null
+    }
+
+    mouseInsideSelected(): boolean {
+        for (const c of this.selected) {
+            if (this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
+                this.worldPos.y >= c.pos.y && this.worldPos.y <= c.pos.y + c.size.y
+            ) {
+                return true
+            }
+        }
+        return false
+    }
+
+    buildClipboardData(): ClipboardData {
+        const selected = this.components.filter(c => c.selected);
+        const data: ClipboardData = {
+            components: [],
+            wires: []
+        };
+        if (selected.length === 0) return data;
+
+        const ids = new Map<Component, string>();
+
+        // Assign temporary IDs
+        for (const c of selected) {
+            const id = crypto.randomUUID();
+            ids.set(c, id);
+
+            data.components.push({
+                id,
+                type: c.id,
+                position: { x: c.pos.x, y: c.pos.y },
+            });
+        }
+
+        // Store only internal wires
+        for (const w of this.wires) {
+            if (ids.has(w.from.parent) && ids.has(w.to.parent)) {
+                data.wires.push({
+                    fromComponentId: ids.get(w.from.parent)!,
+                    fromPortIndex: w.from.index,
+                    toComponentId: ids.get(w.to.parent)!,
+                    toPortIndex: w.to.index
+                });
+            }
+        }
+
+        return data;
+    }
+
+    async copySelected() {
+        const data = this.buildClipboardData();
+        const json = JSON.stringify(data, null, 2);
+
+        await navigator.clipboard.writeText(json);
+    }
+
+    paste(text: string) {
+        this.deselect()
+        const data: ClipboardData = JSON.parse(text);
+
+        // Instantiate components and map old IDs -> new instances
+        const idMap = new Map<string, Component>();
+        for (const c of data.components) {
+            const instance: Component | null = this.createComponentFromType(c.type, new Vec2(c.position.x, c.position.y));
+            if (!instance) {
+                throw "bad id: " + c.type
+            }
+
+            this.select(instance)
+
+            idMap.set(c.id, instance);
+            this.components.push(instance)
+        }
+
+        // Instantiate wires
+        for (const w of data.wires) {
+            const fromComp = idMap.get(w.fromComponentId);
+            const toComp = idMap.get(w.toComponentId);
+
+            if (!fromComp || !toComp) continue; // safety
+
+            const fromPort = fromComp.outputs[w.fromPortIndex];
+            const toPort = toComp.inputs[w.toPortIndex];
+
+            this.addWire(new Wire(fromPort, toPort));
+        }
+    }
+
+    createComponentFromType(type: string, pos: Vec2) {
+        switch (type) {
+            case "Button": return new Button(pos)
+            case "NotGate": return new NotGate(pos)
+            case "AndGate": return new AndGate(pos)
+            case "OrGate": return new OrGate(pos)
+            case "XorGate": return new XorGate(pos)
+            case "NandGate": return new NandGate(pos)
+            case "NorGate": return new NorGate(pos)
+            case "XnorGate": return new XnorGate(pos)
+            case "Led": return new Led(pos)
+            case "Switch": return new Switch(pos)
+            case "Clock": return new Clock(pos)
+            case "DFlipFlop": return new DFlipFlop(pos)
+            case "TFlipFlop": return new TFlipFlop(pos)
+            default: return null
+        }
+    }
+
+    startWireDrag(port: Port) {
         if (this.enabled) return // can't do wires during a sim
-        const worldPos = this.worldFromScreen(mousePos)
         if (port.kind === PortKind.Input) {
             if (port.wires.length === 0) return
             const wire = port.wires[0]
             this.removeWire(wire)
-            this.draggingWire = { from: wire.from, toPos: worldPos, originalWire: wire }
+            this.draggingWire = { from: wire.from, toPos: this.worldPos, originalWire: wire }
         } else {
-            this.draggingWire = { from: port, toPos: worldPos }
+            this.draggingWire = { from: port, toPos: this.worldPos }
         }
     }
 
-    startComponentDrag(component: Component, mousePos: Vec2) {
-        if (this.enabled) return // can't drag components during a sim
-        const worldPos = this.worldFromScreen(mousePos)
-        component.isDragged = true
-        this.draggingComponent = {
-            component: component,
-            toPos: worldPos.sub(component.pos)
+    startComponentDrag() {
+        for (const c of this.selected) {
+            c.isDragged = true
         }
-
-        // Bring to front (or disallow overlapping somehow?)
-        this.components = this.components.filter(x => x !== this.draggingComponent?.component);
-        this.components.push(this.draggingComponent?.component);
+        this.componentDragFrom = this.worldPos
     }
 
-    startPaletteDrag(id: string, mousePos: Vec2) {
-        const worldPos = this.worldFromScreen(mousePos)
-
-        let comp: Component | null = null
-        switch (id) {
-            case "Button": comp = new Button(worldPos); break
-            case "NotGate": comp = new NotGate(worldPos); break
-            case "AndGate": comp = new AndGate(worldPos); break
-            case "OrGate": comp = new OrGate(worldPos); break
-            case "XorGate": comp = new XorGate(worldPos); break
-            case "NandGate": comp = new NandGate(worldPos); break
-            case "NorGate": comp = new NorGate(worldPos); break
-            case "XnorGate": comp = new XnorGate(worldPos); break
-            case "Led": comp = new Led(worldPos); break
-            case "Switch": comp = new Switch(worldPos); break
-            case "Clock": comp = new Clock(worldPos); break
-            case "DFlipFlop": comp = new DFlipFlop(worldPos); break
-            case "TFlipFlop": comp = new TFlipFlop(worldPos); break
-        }
+    startPaletteDrag(id: string) {
+        let comp: Component | null = this.createComponentFromType(id, this.worldPos)
 
         if (comp) {
+            this.deselect()
             this.enabled = false
-            this.draggingComponent = {
-                component: comp,
-                toPos: comp.size.scale(0.5)
-            }
+            this.componentDragFrom = this.worldPos.add(comp.size.scale(0.5))
             comp.isDragged = true
-            this.components.push(this.draggingComponent?.component);
+            this.select(comp)
+            this.components.push(comp);
         }
     }
 
-    handleMouseDown(mousePos: Vec2) {
-        const worldPos = this.worldFromScreen(mousePos)
+    handleMouseDown(e: MouseEvent) {
+        this.mouseDown = true;
+        this.mouseDownWorldPos = new Vec2(this.worldPos.x, this.worldPos.y)
+
         if (this.enabled) {
             // if sim, check interactive components
             for (const c of this.components) {
                 if ("onMouseDown" in c && "onMouseUp" in c && "contains" in c) {
                     const interactive = c as MouseInteractable
-                    if (interactive.contains(worldPos)) {
+                    if (interactive.contains(this.worldPos)) {
                         interactive.onMouseDown()
                     }
                 }
@@ -245,52 +390,73 @@ export class Sim {
                 for (const p of [...c.inputs, ...c.outputs]) {
                     const pos = p.getWorldPos()
                     const clickableRadius = 6
-                    if (Math.abs(worldPos.x - pos.x) < clickableRadius && Math.abs(worldPos.y - pos.y) < clickableRadius) {
-                        this.startWireDrag(p, mousePos)
+                    if (Math.abs(this.worldPos.x - pos.x) < clickableRadius && Math.abs(this.worldPos.y - pos.y) < clickableRadius) {
+                        this.startWireDrag(p)
                         return // stop here
                     }
                 }
             }
         }
 
-        // Check if clicking any component
-        if (!this.enabled) {
+        if (e.shiftKey) {
+            this.selection = { start: this.worldPos, end: this.worldPos }
+        }
+
+        if (!this.mouseInsideSelected()) {
+            this.deselect()
             for (const c of this.components) {
-                if (worldPos.x >= c.pos.x && worldPos.x <= c.pos.x + c.size.x &&
-                    worldPos.y >= c.pos.y && worldPos.y <= c.pos.y + c.size.y
+                if (this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
+                    this.worldPos.y >= c.pos.y && this.worldPos.y <= c.pos.y + c.size.y
                 ) {
-                    this.startComponentDrag(c, mousePos)
+                    this.select(c)
                     return
                 }
             }
         }
-
-        this.dragOffset = {
-            fromPos: worldPos,
-            toPos: worldPos
-        };
     }
 
     handleMouseMove(mousePos: Vec2) {
-        const worldPos = this.worldFromScreen(mousePos)
-        this.worldPos = worldPos
+        this.worldPos = this.worldFromScreen(mousePos)
+
         if (this.draggingWire) {
-            this.draggingWire.toPos = worldPos
+            this.draggingWire.toPos = this.worldPos
             return
         }
 
-        if (this.draggingComponent) {
-            this.draggingComponent.component.pos = worldPos.sub(this.draggingComponent.toPos).snap(20)
+        if (this.selected.length > 0 && this.componentDragFrom) {
+            for (const c of this.selected) {
+                c.pos = c.pos.add(this.worldPos.sub(this.componentDragFrom))
+            }
+            this.componentDragFrom = this.worldPos
             return
         }
 
-        if (this.dragOffset) {
-            this.dragOffset.toPos = worldPos;
+        if (this.mouseDown && this.dragOffset) {
+            this.dragOffset.toPos = this.worldPos
+        }
+
+        if (this.selection) {
+            this.selection.end = this.worldPos
+            return
+        }
+
+        if (this.mouseDown && !this.componentDragFrom) {
+            if (!this.enabled && this.selected.length > 0 && this.mouseInsideSelected()) {
+                this.startComponentDrag()
+                return
+            }
+        }
+
+        if (this.mouseDown && !this.dragOffset && this.worldPos.dist(this.mouseDownWorldPos) > 0.1) {
+            this.dragOffset = {
+                fromPos: this.mouseDownWorldPos,
+                toPos: this.mouseDownWorldPos
+            };
         }
     }
 
-    handleMouseUp(mousePos: Vec2) {
-        const worldPos = this.worldFromScreen(mousePos)
+    handleMouseUp() {
+        this.mouseDown = false
         if (this.draggingWire) {
             const from = this.draggingWire.from;
             for (const c of this.components) {
@@ -299,7 +465,7 @@ export class Sim {
                     const pos = p.getWorldPos()
                     const clickableRadius = 6
 
-                    if (Math.abs(worldPos.x - pos.x) < clickableRadius && Math.abs(worldPos.y - pos.y) < clickableRadius) {
+                    if (Math.abs(this.worldPos.x - pos.x) < clickableRadius && Math.abs(this.worldPos.y - pos.y) < clickableRadius) {
                         if (from.kind === p.kind) break
 
                         const output = from.kind === PortKind.Output ? from : p
@@ -317,22 +483,71 @@ export class Sim {
                 this.removeWire(this.draggingWire.originalWire)
             }
             this.draggingWire = null
-            return
         }
 
-        if (this.draggingComponent) {
-            if (!this.pointInsideBoard(worldPos)) {
-                this.removeComponent(this.draggingComponent.component)
+        if (this.componentDragFrom) {
+            for (let c of this.selected) {
+                c.pos = c.pos.snap(20)
+
+                if (!this.pointInsideBoard(this.worldPos)) {
+                    this.removeComponent(c)
+                }
+                c.isDragged = false
             }
-            this.draggingComponent.component.isDragged = false
-            this.draggingComponent = null
+            this.componentDragFrom = null
             return
         }
 
         if (this.dragOffset) {
             this.cameraPos = this.cameraPos.add(this.dragOffset.fromPos.sub(this.dragOffset.toPos))
             this.dragOffset = null
+        }
+
+        if (this.selection) {
+            this.finishSelection()
+            this.selection = null
             return
+        }
+
+        if (!this.enabled) {
+            this.deselect()
+            for (const c of this.components) {
+                if (this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
+                    this.worldPos.y >= c.pos.y && this.worldPos.y <= c.pos.y + c.size.y
+                ) {
+                    this.select(c)
+                    return
+                }
+            }
+        }
+    }
+
+    private finishSelection() {
+        const start = this.selection!.start!
+        const end = this.selection!.end!
+
+        const minX = Math.min(start.x, end.x)
+        const maxX = Math.max(start.x, end.x)
+        const minY = Math.min(start.y, end.y)
+        const maxY = Math.max(start.y, end.y)
+
+        for (const c of this.components) {
+            const bounds = {
+                x: c.pos.x,
+                y: c.pos.y,
+                width: c.size.x,
+                height: c.size.y
+            }
+
+            const intersects =
+                bounds.x < maxX &&
+                bounds.x + bounds.width > minX &&
+                bounds.y < maxY &&
+                bounds.y + bounds.height > minY
+
+            if (intersects) {
+                this.select(c)
+            }
         }
     }
 
@@ -353,10 +568,6 @@ export class Sim {
 
         this.drawGrid()
 
-        // this.ctx.fillStyle = "red"
-        // const size = 10 // world units
-        // this.ctx.fillRect(this.worldPos.x - size / 2, this.worldPos.y - size / 2, size, size)
-
         for (const c of this.components) {
             c.draw(this.ctx);
         }
@@ -371,27 +582,37 @@ export class Sim {
             this.drawWire(w.from.getWorldPos(), w.to.getWorldPos(), color)
         }
 
+        if (this.selection) {
+            this.ctx.fillStyle = "rgba(74, 163, 255, 0.15)"
+            this.ctx.strokeStyle = "#4aa3ff"
+            this.ctx.lineWidth = 1
+            const size = this.selection.end.sub(this.selection.start)
+            this.ctx.fillRect(this.selection.start.x, this.selection.start.y, size.x, size.y)
+            this.ctx.strokeRect(this.selection.start.x, this.selection.start.y, size.x, size.y)
+        }
+
         this.ctx.restore()
     }
 
     drawGrid() {
-        this.ctx.fillStyle = "#FDF6E3"
+        this.ctx.fillStyle = "#ebebeb"
+        this.ctx.strokeStyle = "#ebebeb";
         this.ctx.beginPath();
         this.ctx.roundRect(0, 0, this.size.x, this.size.y, 6);
         this.ctx.fill();
         this.ctx.stroke();
 
-        this.ctx.strokeStyle = "rgba(0,0,0,0.05)";
-        this.ctx.lineWidth = 1;
+        this.ctx.strokeStyle = "#e0e0e0";
+        this.ctx.lineWidth = 1.0 / this.cameraZoom;
 
-        for (let x = 0; x < this.size.x; x += this.pitch) {
+        for (let x = this.pitch; x < this.size.x; x += this.pitch) {
             this.ctx.beginPath();
             this.ctx.moveTo(x, 0);
             this.ctx.lineTo(x, this.size.y);
             this.ctx.stroke();
         }
 
-        for (let y = 0; y < this.size.y; y += this.pitch) {
+        for (let y = this.pitch; y < this.size.y; y += this.pitch) {
             this.ctx.beginPath();
             this.ctx.moveTo(0, y);
             this.ctx.lineTo(this.size.x, y);
@@ -405,7 +626,7 @@ export class Sim {
         const m = fromPos.add(toPos).scale(0.5)
         const detour2 = toPos.sub(new Vec2(padding, 0))
 
-        this.ctx.lineWidth = 2;
+        this.ctx.lineWidth = 1;
         this.ctx.strokeStyle = color // 
         this.ctx.lineCap = "round";
         this.ctx.lineJoin = "round";

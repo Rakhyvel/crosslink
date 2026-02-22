@@ -28,4 +28,12 @@ export class Vec2 {
         const snapY = Math.round(this.y / grid) * grid;
         return new Vec2(snapX, snapY)
     }
+
+    norm(): number {
+        return Math.sqrt(this.x * this.x + this.y * this.y)
+    }
+
+    dist(other: Vec2): number {
+        return this.sub(other).norm()
+    }
 }

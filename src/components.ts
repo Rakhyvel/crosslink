@@ -8,7 +8,11 @@ export interface Component {
     outputs: Port[]
 
     isDragged: boolean
+    selected: boolean
 
+    id: string
+
+    clone(): Component
     update(): void
     draw(ctx: CanvasRenderingContext2D): void
 }
@@ -24,7 +28,8 @@ export class Port {
         public id: string,
         public offset: Vec2,
         public parent: Component,
-        public kind: PortKind
+        public kind: PortKind,
+        public index: number
     ) { }
 
     private _value: Signal = 0
@@ -53,9 +58,12 @@ export abstract class Gate implements Component {
     inputs: Port[] = []
     outputs: Port[] = []
     isDragged: boolean = false
+    selected: boolean = false
+    id: string
 
-    constructor(pos: Vec2, inputNames: string[], outputNames: string[], width = 60) {
+    constructor(pos: Vec2, id: string, inputNames: string[], outputNames: string[], width = 60) {
         this.pos = pos
+        this.id = id
 
         // Determine height based on max of input/output count
         const n = Math.max(inputNames.length, outputNames.length)
@@ -64,20 +72,27 @@ export abstract class Gate implements Component {
 
         // Assign ports
         this.inputs = inputNames.map((id, i) =>
-            new Port(id, new Vec2(0, (i + 1) * this.size.y / (inputNames.length + 1)), this, PortKind.Input)
+            new Port(id, new Vec2(0, (i + 1) * this.size.y / (inputNames.length + 1)), this, PortKind.Input, i)
         )
         this.outputs = outputNames.map((id, i) =>
-            new Port(id, new Vec2(this.size.x, (i + 1) * this.size.y / (outputNames.length + 1)), this, PortKind.Output)
+            new Port(id, new Vec2(this.size.x, (i + 1) * this.size.y / (outputNames.length + 1)), this, PortKind.Output, i)
         )
     }
 
     draw(ctx: CanvasRenderingContext2D) {
         const opacity = this.isDragged ? "88" : "ff"
 
+        if (this.selected) {
+            ctx.fillStyle = "#4aa3ff" + opacity
+            ctx.beginPath();
+            ctx.roundRect(this.pos.x - 2, this.pos.y - 2, this.size.x + 4, this.size.y + 4, 8);
+            ctx.fill();
+        }
+
         // Draw box
-        ctx.fillStyle = "#fcfbf8" + opacity;
+        ctx.fillStyle = "#e9e9e9" + opacity;
         ctx.strokeStyle = "#4b4b4b" + opacity;
-        ctx.lineWidth = 1.25;
+        ctx.lineWidth = 0.5;
 
         ctx.beginPath();
         ctx.roundRect(this.pos.x, this.pos.y, this.size.x, this.size.y, 6);
@@ -112,6 +127,7 @@ export abstract class Gate implements Component {
         }
     }
 
+    abstract clone(): Component
     abstract update(): void
     abstract getLabel(): string
 }
@@ -124,7 +140,11 @@ export interface MouseInteractable {
 
 export class NotGate extends Gate {
     constructor(pos: Vec2) {
-        super(pos, ["in"], ["out"])
+        super(pos, "NotGate", ["in"], ["out"])
+    }
+
+    clone() {
+        return new NotGate(this.pos)
     }
 
     update() {
@@ -138,7 +158,11 @@ export class NotGate extends Gate {
 
 export class AndGate extends Gate {
     constructor(pos: Vec2) {
-        super(pos, ["x", "y"], ["out"])
+        super(pos, "AndGate", ["x", "y"], ["out"])
+    }
+
+    clone() {
+        return new AndGate(this.pos)
     }
 
     update() {
@@ -154,7 +178,11 @@ export class AndGate extends Gate {
 
 export class OrGate extends Gate {
     constructor(pos: Vec2) {
-        super(pos, ["x", "y"], ["out"])
+        super(pos, "OrGate", ["x", "y"], ["out"])
+    }
+
+    clone() {
+        return new OrGate(this.pos)
     }
 
     update() {
@@ -170,7 +198,11 @@ export class OrGate extends Gate {
 
 export class XorGate extends Gate {
     constructor(pos: Vec2) {
-        super(pos, ["x", "y"], ["out"])
+        super(pos, "XorGate", ["x", "y"], ["out"])
+    }
+
+    clone() {
+        return new XorGate(this.pos)
     }
 
     update() {
@@ -186,7 +218,11 @@ export class XorGate extends Gate {
 
 export class NandGate extends Gate {
     constructor(pos: Vec2) {
-        super(pos, ["x", "y"], ["out"])
+        super(pos, "NandGate", ["x", "y"], ["out"])
+    }
+
+    clone() {
+        return new NandGate(this.pos)
     }
 
     update() {
@@ -203,7 +239,11 @@ export class NandGate extends Gate {
 
 export class NorGate extends Gate {
     constructor(pos: Vec2) {
-        super(pos, ["x", "y"], ["out"])
+        super(pos, "NorGate", ["x", "y"], ["out"])
+    }
+
+    clone() {
+        return new NorGate(this.pos)
     }
 
     update() {
@@ -220,7 +260,11 @@ export class NorGate extends Gate {
 
 export class XnorGate extends Gate {
     constructor(pos: Vec2) {
-        super(pos, ["x", "y"], ["out"])
+        super(pos, "XnorGate", ["x", "y"], ["out"])
+    }
+
+    clone() {
+        return new XnorGate(this.pos)
     }
 
     update() {
@@ -239,7 +283,11 @@ export class Button extends Gate implements MouseInteractable {
     pressed = false
 
     constructor(pos: Vec2) {
-        super(pos, [], ["out"])
+        super(pos, "Button", [], ["out"])
+    }
+
+    clone() {
+        return new Button(this.pos)
     }
 
     update() {
@@ -283,7 +331,11 @@ export class Switch extends Gate implements MouseInteractable {
     pressed = false
 
     constructor(pos: Vec2) {
-        super(pos, [], ["out"])
+        super(pos, "Switch", [], ["out"])
+    }
+
+    clone() {
+        return new Switch(this.pos)
     }
 
     update() {
@@ -327,7 +379,11 @@ export class Clock extends Gate {
     state = 0
 
     constructor(pos: Vec2) {
-        super(pos, [], ["out"])
+        super(pos, "Clock", [], ["out"])
+    }
+
+    clone() {
+        return new Clock(this.pos)
     }
 
     update() {
@@ -352,7 +408,11 @@ export class DFlipFlop extends Gate {
     private prevClock = 0
 
     constructor(pos: Vec2) {
-        super(pos, ["d", "clk"], ["Q", "!Q"])
+        super(pos, "DFlipFlop", ["d", "clk"], ["Q", "!Q"])
+    }
+
+    clone() {
+        return new DFlipFlop(this.pos)
     }
 
     update() {
@@ -380,7 +440,11 @@ export class TFlipFlop extends Gate {
     private prevClock = 0
 
     constructor(pos: Vec2) {
-        super(pos, ["t", "clk"], ["Q"])
+        super(pos, "TFlipFlop", ["t", "clk"], ["Q"])
+    }
+
+    clone() {
+        return new TFlipFlop(this.pos)
     }
 
     update() {
@@ -406,7 +470,11 @@ export class TFlipFlop extends Gate {
 export class Led extends Gate {
 
     constructor(pos: Vec2) {
-        super(pos, ["in"], [])
+        super(pos, "Led", ["in"], [])
+    }
+
+    clone() {
+        return new Led(this.pos)
     }
 
     update() {
