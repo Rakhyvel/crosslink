@@ -109,14 +109,34 @@ export class MoveComponentsCommand implements Command {
     }
 }
 
-export class AddWireCommand implements Command {
-    constructor(private wire: Wire) { }
+export class AddWiresCommand implements Command {
+    constructor(private wires: Wire[]) { }
 
     do(sim: Sim) {
-        sim.addWire(this.wire)
+        for (const w of this.wires) {
+            sim.addWire(w)
+        }
     }
 
     undo(sim: Sim) {
-        sim.removeWire(this.wire)
+        for (const w of this.wires) {
+            sim.removeWire(w)
+        }
+    }
+}
+
+export class RemoveWiresCommand implements Command {
+    constructor(private wires: Wire[]) { }
+
+    do(sim: Sim) {
+        for (const w of this.wires) {
+            sim.removeWire(w)
+        }
+    }
+
+    undo(sim: Sim) {
+        for (const w of this.wires) {
+            sim.addWire(w)
+        }
     }
 }

@@ -1,6 +1,6 @@
 import { AndGate, Button, Led, NotGate, OrGate, Port, XorGate, PortKind, Wire, Switch, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable } from './components.ts'
 import { Vec2 } from './vec.ts'
-import { AddComponentsCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand } from './command.ts'
+import { AddComponentsCommand, AddWiresCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand, RemoveWiresCommand } from './command.ts'
 
 interface DraggingComponent {
     fromPos: Vec2
@@ -63,7 +63,7 @@ export class Sim {
     private _enabled: boolean = false
 
     pitch: number = 20
-    size: Vec2 = new Vec2(27, 22).scale(this.pitch)
+    size: Vec2 = new Vec2(24, 18).scale(this.pitch)
 
     selected: Component[] = []
 
@@ -331,7 +331,7 @@ export class Sim {
         const idMap = new Map<string, Component>();
         const components = new Array<Component>();
         for (const c of data.components) {
-            const instance: Component | null = this.createComponentFromType(c.type, new Vec2(c.position.x, c.position.y));
+            const instance: Component | null = this.createComponentFromType(c.type, new Vec2(c.position.x, c.position.y).add(new Vec2(20, 20)));
             if (!instance) {
                 throw "bad id: " + c.type
             }
@@ -511,13 +511,14 @@ export class Sim {
                 const input = from.kind === PortKind.Input ? from : port
 
                 const wire = new Wire(output, input)
-                this.addWire(wire)
+                this.history.execute(new AddWiresCommand([wire]), this)
                 this.draggingWire = null
                 return
             }
 
             if (this.draggingWire.originalWire) {
                 this.removeWire(this.draggingWire.originalWire)
+                this.history.execute(new RemoveWiresCommand([this.draggingWire.originalWire]), this)
             }
             this.draggingWire = null
         }
