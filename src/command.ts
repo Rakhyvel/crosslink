@@ -33,29 +33,43 @@ export class History {
 }
 
 export class AddComponentsCommand implements Command {
+    private removedWires: Wire[] = []
+
     constructor(private components: Component[]) { }
 
     do(sim: Sim) {
         sim.addComponents(this.components)
+        console.log(this.removedWires)
+        for (const w of this.removedWires) {
+            sim.addWire(w)
+        }
     }
 
     undo(sim: Sim) {
+        this.removedWires = []
+        for (const c of this.components) {
+            this.removedWires = this.removedWires.concat(sim.getWiresForComponent(c))
+        }
         sim.removeComponents(this.components)
     }
 }
 
-export class RemoveComponentCommand implements Command {
+export class RemoveComponentsCommand implements Command {
     private removedWires: Wire[] = []
 
-    constructor(private component: Component) { }
+    constructor(private components: Component[]) { }
 
     do(sim: Sim) {
-        this.removedWires = sim.getWiresForComponent(this.component)
-        sim.removeComponent(this.component)
+        this.removedWires = []
+        for (const c of this.components) {
+            this.removedWires = this.removedWires.concat(sim.getWiresForComponent(c))
+        }
+        sim.removeComponents(this.components)
     }
 
     undo(sim: Sim) {
-        sim.addComponent(this.component)
+        sim.addComponents(this.components)
+        console.log(this.removedWires)
         for (const w of this.removedWires) {
             sim.addWire(w)
         }

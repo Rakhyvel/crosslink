@@ -1,6 +1,6 @@
 import { AndGate, Button, Led, NotGate, OrGate, Port, XorGate, PortKind, Wire, Switch, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable } from './components.ts'
 import { Vec2 } from './vec.ts'
-import { AddComponentsCommand, History } from './command.ts'
+import { AddComponentsCommand, History, RemoveComponentsCommand } from './command.ts'
 
 interface DraggingComponent {
     fromPos: Vec2
@@ -179,9 +179,7 @@ export class Sim {
     }
 
     clearSelected() {
-        for (const c of [...this.selected]) {
-            this.removeComponent(c)
-        }
+        this.history.execute(new RemoveComponentsCommand([...this.selected]), this)
     }
 
     select(component: Component) {
@@ -359,10 +357,12 @@ export class Sim {
 
     undo() {
         this.history.undo(this)
+        console.log(this.wires.length)
     }
 
     redo() {
         this.history.redo(this)
+        console.log(this.wires.length)
     }
 
     createComponentFromType(type: string, pos: Vec2) {
