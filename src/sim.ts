@@ -36,13 +36,6 @@ type ClipboardData = {
     }[]
 }
 
-type DragState =
-    | { type: "none" }
-    | { type: "component"; components: Component[]; startPos: Vec2 }
-    | { type: "wire"; from: Port; originalWire?: Wire }
-    | { type: "selection"; start: Vec2; end: Vec2 }
-    | { type: "camera"; from: Vec2; to: Vec2 }
-
 export class Sim {
     components: Component[] = []
     wires: Wire[] = []
@@ -149,6 +142,7 @@ export class Sim {
         }
 
         this.components = this.components.filter(x => x !== component)
+        this.selected = this.selected.filter(x => x !== component)
     }
 
     clear() {
@@ -156,10 +150,23 @@ export class Sim {
         this.wires = []
     }
 
+    clearSelected() {
+        for (const c of [...this.selected]) {
+            this.removeComponent(c)
+        }
+    }
+
     select(component: Component) {
         if (this.enabled) return
         component.selected = true
         this.selected.push(component)
+    }
+
+    selectAll() {
+        this.deselect()
+        for (const c of this.components) {
+            this.select(c)
+        }
     }
 
     deselect() {
@@ -170,9 +177,14 @@ export class Sim {
     }
 
     set enabled(e: boolean) {
+        this.canvas.classList.remove("running")
+        this.canvas.classList.remove("build")
         if (e) {
             this.lastTick = Date.now()
             this.deselect()
+            this.canvas.classList.add("running")
+        } else {
+            this.canvas.classList.add("build")
         }
         this._enabled = e
     }

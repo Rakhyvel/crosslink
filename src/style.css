@@ -110,3 +110,13 @@ body {
   height: 100%;
   display: block;
 }
+
+#sim-canvas.running {
+  box-shadow: inset 0 0 30px rgba(0, 255, 0, 0.3);
+  transition: box-shadow 0.3s ease;
+}
+
+#sim-canvas.build {
+  box-shadow: none;
+  transition: box-shadow 0.3s ease;
+}

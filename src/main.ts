@@ -84,7 +84,14 @@ window.addEventListener("keydown", async (e: KeyboardEvent) => {
             } catch (err) {
                 console.warn("Clipboard does not contain valid circuit data", err);
             }
+        } else if (e.key.toLowerCase() == "a") {
+            sim.selectAll()
         }
+    } else if (e.key === "Backspace" || e.key === "Delete") {
+        e.preventDefault()
+        sim.clearSelected()
+    } else if (e.key === " ") {
+        sim.enabled = !sim.enabled
     }
 });
 
