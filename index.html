@@ -3,6 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=IBM+Plex+Sans:wght@400;500&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
     <title>crosslink</title>
   </head>
   <body>
@@ -23,18 +24,42 @@
       <div id="workspace">
         <div id="palette">
           <!-- data-type should be the actual class in ts -->
-          <div class="palette-item" data-type="InputPin">Input</div>
-          <div class="palette-item" data-type="OutputPin">Output</div>
-          <div class="palette-item" data-type="NotGate">NOT Gate</div>
-          <div class="palette-item" data-type="AndGate">AND Gate</div>
-          <div class="palette-item" data-type="OrGate">OR Gate</div>
-          <div class="palette-item" data-type="XorGate">XOR Gate</div>
-          <div class="palette-item" data-type="NandGate">NAND Gate</div>
-          <div class="palette-item" data-type="NorGate">NOR Gate</div>
-          <div class="palette-item" data-type="XnorGate">XNOR Gate</div>
-          <div class="palette-item" data-type="Clock">Clock</div>
-          <div class="palette-item" data-type="DFlipFlop">D Flip-Flop</div>
-          <div class="palette-item" data-type="TFlipFlop">T Flip-Flop</div>
+          <div class="palette-section">
+            <div class="palette-header">Logic</div>
+            <div class="palette-items">
+              <div class="palette-item" data-type="NotGate">NOT Gate</div>
+              <div class="palette-item" data-type="AndGate">AND Gate</div>
+              <div class="palette-item" data-type="OrGate">OR Gate</div>
+              <div class="palette-item" data-type="XorGate">XOR Gate</div>
+              <div class="palette-item" data-type="NandGate">NAND Gate</div>
+              <div class="palette-item" data-type="NorGate">NOR Gate</div>
+              <div class="palette-item" data-type="XnorGate">XNOR Gate</div>
+            </div>
+          </div>
+
+          <div class="palette-section">
+            <div class="palette-header">IO</div>
+            <div class="palette-items">
+              <div class="palette-item" data-type="InputPin">Input</div>
+              <div class="palette-item" data-type="OutputPin">Output</div>
+              <div class="palette-item" data-type="Clock">Clock</div>
+            </div>
+          </div>
+
+          <div class="palette-section">
+            <div class="palette-header">Memory</div>
+            <div class="palette-items">
+              <div class="palette-item" data-type="DFlipFlop">D Flip-Flop</div>
+              <div class="palette-item" data-type="TFlipFlop">T Flip-Flop</div>
+            </div>
+          </div>
+
+          <div class="palette-section">
+            <div class="palette-header">Custom</div>
+            <div class="palette-items">
+              <!-- dynamically filled later -->
+            </div>
+          </div>
         </div>
 
         <div id="editor">

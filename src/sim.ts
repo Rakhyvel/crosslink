@@ -1,6 +1,7 @@
-import { AndGate, NotGate, OrGate, Port, XorGate, PortKind, Wire, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable, InputPin, OutputPin } from './components.ts'
+import { AndGate, NotGate, OrGate, Port, XorGate, PortKind, Wire, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, InputPin, OutputPin } from './components.ts'
 import { Vec2 } from './vec.ts'
 import { AddComponentsCommand, AddWiresCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand, RemoveWiresCommand } from './command.ts'
+import { Board, BoardSize } from './board.ts'
 
 interface DraggingComponent {
     fromPos: Vec2
@@ -38,8 +39,7 @@ type ClipboardData = {
 }
 
 export class Sim {
-    components: Component[] = []
-    wires: Wire[] = []
+    board: Board
 
     draggingComponent: DraggingComponent | null = null
     componentDragFrom: Vec2 | null = null
@@ -62,9 +62,6 @@ export class Sim {
 
     private _enabled: boolean = false
 
-    pitch: number = 20
-    size: Vec2 = new Vec2(11, 8).scale(this.pitch) // (24, 18), (32, 22)
-
     selected: Component[] = []
 
     history: History = new History()
@@ -78,22 +75,24 @@ export class Sim {
             const zoomFactor = 1.1
             this.cameraZoom *= e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
         })
+
+        this.board = new Board(BoardSize.Small, "Untitled Component")
     }
 
     worldFromScreen(screen: Vec2): Vec2 {
-        const worldX = (screen.x - this.canvas.width / 2) / this.cameraZoom + this.size.x / 2 + this.cameraPos.x
-        const worldY = (screen.y - this.canvas.height / 2) / this.cameraZoom + this.size.y / 2 + this.cameraPos.y
+        const worldX = (screen.x - this.canvas.width / 2) / this.cameraZoom + this.board.size.x / 2 + this.cameraPos.x
+        const worldY = (screen.y - this.canvas.height / 2) / this.cameraZoom + this.board.size.y / 2 + this.cameraPos.y
         return new Vec2(worldX, worldY);
     }
 
     screenFromWorld(world: Vec2): Vec2 {
-        const screenX = (world.x - this.size.x / 2) * this.cameraZoom + this.canvas.width / 2
-        const screenY = (world.y - this.size.y / 2) * this.cameraZoom + this.canvas.height / 2
+        const screenX = (world.x - this.board.size.x / 2) * this.cameraZoom + this.canvas.width / 2
+        const screenY = (world.y - this.board.size.y / 2) * this.cameraZoom + this.canvas.height / 2
         return new Vec2(screenX, screenY);
     }
 
     pointInsideBoard(p: Vec2): boolean {
-        return (p.x >= 0 && p.x < this.size.x && p.y >= 0 && p.y < this.size.y)
+        return (p.x >= 0 && p.x < this.board.size.x && p.y >= 0 && p.y < this.board.size.y)
     }
 
     getOffset(): Vec2 {
@@ -108,31 +107,8 @@ export class Sim {
         this.deselect()
         for (const c of cs) {
             this.select(c)
-            this.components.push(c)
         }
-    }
-
-    addWire(w: Wire) {
-        if (w.to.kind == PortKind.Input) {
-            w.to.wires.forEach(oldWire => this.removeWire(oldWire))
-            w.to.wires = [w]
-        }
-        w.from.wires.push(w)
-        this.wires.push(w)
-    }
-
-    removeWire(w: Wire) {
-        this.wires = this.wires.filter(x => x !== w)
-        w.from.wires = w.from.wires.filter(x => x !== w)
-        w.to.wires = w.to.wires.filter(x => x !== w)
-    }
-
-    removeWireAttachedTo(port: Port) {
-        this.wires = this.wires.filter(w => w.from !== port && w.to !== port)
-    }
-
-    removeWireAttachedFrom(port: Port) {
-        this.wires = this.wires.filter(w => w.from !== port && w.to !== port)
+        this.board.addComponents(cs)
     }
 
     getWiresForComponent(component: Component) {
@@ -157,26 +133,21 @@ export class Sim {
     }
 
     removeComponent(component: Component) {
-        // Remove any wires
-        for (const inputs of component.inputs) {
-            for (const w of inputs.wires) {
-                this.removeWire(w)
-            }
-        }
-        for (const outputs of component.outputs) {
-            for (const w of outputs.wires) {
-                this.removeWire(w)
-            }
-        }
-
-        this.components = this.components.filter(x => x !== component)
+        this.board.removeComponent(component)
         this.selected = this.selected.filter(x => x !== component)
+    }
+
+    addWire(wire: Wire) {
+        this.board.addWire(wire)
+    }
+
+    removeWire(wire: Wire) {
+        this.board.removeWire(wire)
     }
 
     clear() {
         this.enabled = false
-        this.components = []
-        this.wires = []
+        this.board.clear()
     }
 
     clearSelected() {
@@ -192,9 +163,7 @@ export class Sim {
 
     selectAll() {
         this.deselect()
-        for (const c of this.components) {
-            this.select(c)
-        }
+        this.board.forEachComponent((c, _i) => this.select(c))
     }
 
     deselect() {
@@ -241,34 +210,7 @@ export class Sim {
     }
 
     step() {
-        for (const c of this.components) {
-            c.update()
-            for (const p of c.inputs) {
-                p.value = 0
-            }
-        }
-
-        for (const w of this.wires) {
-            w.to.value = w.from.value
-        }
-    }
-
-    hitTestComponents(pos: Vec2): Component | null {
-        return this.components.find(c =>
-            pos.x >= c.pos.x && pos.x <= c.pos.x + c.size.x &&
-            pos.y >= c.pos.y && pos.y <= c.pos.y + c.size.y
-        ) ?? null
-    }
-
-    hitTestPorts(pos: Vec2, radius = 6): Port | null {
-        for (const c of this.components) {
-            for (const p of [...c.inputs, ...c.outputs]) {
-                const world = p.getWorldPos()
-                if (Math.abs(pos.x - world.x) < radius &&
-                    Math.abs(pos.y - world.y) < radius) return p
-            }
-        }
-        return null
+        this.board.step()
     }
 
     mouseInsideSelected(): boolean {
@@ -283,7 +225,7 @@ export class Sim {
     }
 
     buildClipboardData(): ClipboardData {
-        const selected = this.components.filter(c => c.selected);
+        const selected = this.selected;
         const data: ClipboardData = {
             components: [],
             wires: []
@@ -305,15 +247,13 @@ export class Sim {
         }
 
         // Store only internal wires
-        for (const w of this.wires) {
-            if (ids.has(w.from.parent) && ids.has(w.to.parent)) {
-                data.wires.push({
-                    fromComponentId: ids.get(w.from.parent)!,
-                    fromPortIndex: w.from.index,
-                    toComponentId: ids.get(w.to.parent)!,
-                    toPortIndex: w.to.index
-                });
-            }
+        for (const w of this.board.getInternalWires(selected)) {
+            data.wires.push({
+                fromComponentId: ids.get(w.from.parent)!,
+                fromPortIndex: w.from.index,
+                toComponentId: ids.get(w.to.parent)!,
+                toPortIndex: w.to.index
+            });
         }
 
         return data;
@@ -418,13 +358,9 @@ export class Sim {
 
     selectSingleComponent() {
         this.deselect()
-        for (const c of this.components) {
-            if (c.movable && this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
-                this.worldPos.y >= c.pos.y && this.worldPos.y <= c.pos.y + c.size.y
-            ) {
-                this.select(c)
-                return
-            }
+        const comp = this.board.hitTestComponents(this.worldPos)
+        if (comp) {
+            this.select(comp)
         }
     }
 
@@ -433,20 +369,12 @@ export class Sim {
         this.mouseDownWorldPos = new Vec2(this.worldPos.x, this.worldPos.y)
 
         if (this.enabled) {
-            // if sim, check interactive components
-            for (const c of this.components) {
-                if ("onMouseDown" in c && "onMouseUp" in c && "contains" in c) {
-                    const interactive = c as MouseInteractable
-                    if (interactive.contains(this.worldPos)) {
-                        interactive.onMouseDown()
-                    }
-                }
-            }
+            this.board.interactComponents(this.worldPos)
         }
 
         // Check if clicking on any port
         if (!this.enabled) {
-            const port = this.hitTestPorts(this.worldPos)
+            const port = this.board.hitTestPorts(this.worldPos)
             if (port) {
                 this.startWireDrag(port)
                 return
@@ -505,7 +433,7 @@ export class Sim {
         this.mouseDown = false
         if (this.draggingWire) {
             const from = this.draggingWire.from;
-            const port = this.hitTestPorts(this.worldPos)
+            const port = this.board.hitTestPorts(this.worldPos)
             if (port && from.kind !== port.kind) {
 
                 const output = from.kind === PortKind.Output ? from : port
@@ -528,7 +456,7 @@ export class Sim {
             const cmds = []
             for (let c of this.selected) {
                 const dropPoint = c.pos.add(c.dragOffset!).snap(20, new Vec2(0, 10))
-                if (!this.pointInsideBoard(dropPoint)) {
+                if (!this.board.pointInside(dropPoint)) {
                     cmds.push(new RemoveComponentsCommand([c]))
                 } else if (c.dropped) {
                     cmds.push(new MoveComponentsCommand([c], [c.pos], [dropPoint]))
@@ -563,28 +491,9 @@ export class Sim {
         const start = this.selection!.start!
         const end = this.selection!.end!
 
-        const minX = Math.min(start.x, end.x)
-        const maxX = Math.max(start.x, end.x)
-        const minY = Math.min(start.y, end.y)
-        const maxY = Math.max(start.y, end.y)
-
-        for (const c of this.components) {
-            const bounds = {
-                x: c.pos.x,
-                y: c.pos.y,
-                width: c.size.x,
-                height: c.size.y
-            }
-
-            const intersects =
-                bounds.x < maxX &&
-                bounds.x + bounds.width > minX &&
-                bounds.y < maxY &&
-                bounds.y + bounds.height > minY
-
-            if (intersects) {
-                this.select(c)
-            }
+        const selectedComponents = this.board.hitTestComponentsRect(start, end)
+        for (const c of selectedComponents) {
+            this.select(c)
         }
     }
 
@@ -593,7 +502,7 @@ export class Sim {
         this.ctx.save()
 
         const canvasVec = new Vec2(this.canvas.width, this.canvas.height).scale(0.5)
-        const boardVec = new Vec2(this.size.x, this.size.y).scale(0.5)
+        const boardVec = new Vec2(this.board.size.x, this.board.size.y).scale(0.5)
         let offset = boardVec.add(this.cameraPos)
         if (this.dragOffset) {
             offset = offset.add(this.dragOffset.fromPos.sub(this.dragOffset.toPos))
@@ -603,20 +512,12 @@ export class Sim {
         this.ctx.scale(this.cameraZoom, this.cameraZoom)
         this.ctx.translate(-offset.x, -offset.y)
 
-        this.drawGrid()
+        this.board.draw(this.ctx)
 
-        for (const c of this.components) {
-            c.draw(this.ctx);
-        }
 
         if (this.draggingWire) {
             const color = "#4af"
-            this.drawWire(this.draggingWire.from.getWorldPos(), this.draggingWire.toPos, color)
-        }
-
-        for (const w of this.wires) {
-            let color = w.from.value ? "#4caf50" : "#555"
-            this.drawWire(w.from.getWorldPos(), w.to.getWorldPos(), color)
+            this.board.drawWire(this.ctx, this.draggingWire.from.getWorldPos(), this.draggingWire.toPos, color)
         }
 
         if (this.selection) {
@@ -629,57 +530,5 @@ export class Sim {
         }
 
         this.ctx.restore()
-    }
-
-    drawGrid() {
-        this.ctx.fillStyle = "#ebebeb"
-        this.ctx.strokeStyle = "#ebebeb";
-        this.ctx.beginPath();
-        this.ctx.fillRect(0, 0, this.size.x, this.size.y);
-        // this.ctx.fill();
-        this.ctx.stroke();
-
-        this.ctx.strokeStyle = "#e0e0e0";
-        this.ctx.lineWidth = 1.0 / this.cameraZoom;
-
-        for (let x = this.pitch; x < this.size.x; x += this.pitch) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(x, this.pitch);
-            this.ctx.lineTo(x, this.size.y - this.pitch);
-            this.ctx.stroke();
-        }
-
-        for (let y = this.pitch; y < this.size.y; y += this.pitch) {
-            this.ctx.beginPath();
-            this.ctx.moveTo(this.pitch, y);
-            this.ctx.lineTo(this.size.x - this.pitch, y);
-            this.ctx.stroke();
-        }
-    }
-
-    drawWire(fromPos: Vec2, toPos: Vec2, color: string) {
-        const padding = 10
-        const detour1 = fromPos.add(new Vec2(padding, 0))
-        const m = fromPos.add(toPos).scale(0.5)
-        const detour2 = toPos.sub(new Vec2(padding, 0))
-
-        this.ctx.lineWidth = 1;
-        this.ctx.strokeStyle = color // 
-        this.ctx.lineCap = "round";
-        this.ctx.lineJoin = "round";
-
-        this.ctx.beginPath();
-        this.ctx.moveTo(fromPos.x, fromPos.y);
-        this.ctx.lineTo(detour1.x, fromPos.y);
-        if (toPos.x >= fromPos.x + 2 * padding) {
-            this.ctx.lineTo(m.x, fromPos.y);
-            this.ctx.lineTo(m.x, toPos.y);
-        } else {
-            this.ctx.lineTo(detour1.x, m.y);
-            this.ctx.lineTo(detour2.x, m.y);
-        }
-        this.ctx.lineTo(detour2.x, toPos.y);
-        this.ctx.lineTo(toPos.x, toPos.y);
-        this.ctx.stroke();
     }
 }

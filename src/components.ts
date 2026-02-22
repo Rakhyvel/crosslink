@@ -119,8 +119,8 @@ export abstract class Gate implements Component {
         ctx.strokeRect(realPos.x, realPos.y, this.size.x, this.size.y);
 
         // Draw label
-        ctx.fillStyle = "#222222" + opacity;
-        ctx.font = "12px system-ui, sans-serif";
+        ctx.fillStyle = "#818181" + opacity;
+        ctx.font = "10px caveat";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
         ctx.fillText(this.getLabel(), realPos.x + this.size.x / 2, realPos.y + this.size.y / 2);

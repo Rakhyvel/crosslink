@@ -109,6 +109,13 @@ document.querySelectorAll(".palette-item").forEach(el => {
     })
 })
 
+document.querySelectorAll(".palette-header").forEach(header => {
+    header.addEventListener("click", () => {
+        const section = header.parentElement!;
+        section.classList.toggle("open");
+    });
+});
+
 startButton.addEventListener("click", () => {
     sim.enabled = true
 })
