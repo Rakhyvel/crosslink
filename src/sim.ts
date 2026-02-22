@@ -1,4 +1,4 @@
-import { AndGate, Button, Led, NotGate, OrGate, Port, XorGate, PortKind, Wire, Switch, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable } from './components.ts'
+import { AndGate, NotGate, OrGate, Port, XorGate, PortKind, Wire, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, type MouseInteractable, InputPin, OutputPin } from './components.ts'
 import { Vec2 } from './vec.ts'
 import { AddComponentsCommand, AddWiresCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand, RemoveWiresCommand } from './command.ts'
 
@@ -48,7 +48,7 @@ export class Sim {
     selection: Selection | null = null
 
     cameraPos: Vec2 = new Vec2(0, 0)
-    cameraZoom: number = 1.5
+    cameraZoom: number = 3.0
 
     canvas: HTMLCanvasElement
     ctx: CanvasRenderingContext2D
@@ -63,7 +63,7 @@ export class Sim {
     private _enabled: boolean = false
 
     pitch: number = 20
-    size: Vec2 = new Vec2(24, 18).scale(this.pitch)
+    size: Vec2 = new Vec2(11, 8).scale(this.pitch) // (24, 18), (32, 22)
 
     selected: Component[] = []
 
@@ -174,11 +174,13 @@ export class Sim {
     }
 
     clear() {
+        this.enabled = false
         this.components = []
         this.wires = []
     }
 
     clearSelected() {
+        this.enabled = false
         this.history.execute(new RemoveComponentsCommand([...this.selected]), this)
     }
 
@@ -368,7 +370,8 @@ export class Sim {
 
     createComponentFromType(type: string, pos: Vec2) {
         switch (type) {
-            case "Button": return new Button(pos)
+            case "InputPin": return new InputPin(pos)
+            case "OutputPin": return new OutputPin(pos)
             case "NotGate": return new NotGate(pos)
             case "AndGate": return new AndGate(pos)
             case "OrGate": return new OrGate(pos)
@@ -376,8 +379,6 @@ export class Sim {
             case "NandGate": return new NandGate(pos)
             case "NorGate": return new NorGate(pos)
             case "XnorGate": return new XnorGate(pos)
-            case "Led": return new Led(pos)
-            case "Switch": return new Switch(pos)
             case "Clock": return new Clock(pos)
             case "DFlipFlop": return new DFlipFlop(pos)
             case "TFlipFlop": return new TFlipFlop(pos)
@@ -418,7 +419,7 @@ export class Sim {
     selectSingleComponent() {
         this.deselect()
         for (const c of this.components) {
-            if (this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
+            if (c.movable && this.worldPos.x >= c.pos.x && this.worldPos.x <= c.pos.x + c.size.x &&
                 this.worldPos.y >= c.pos.y && this.worldPos.y <= c.pos.y + c.size.y
             ) {
                 this.select(c)
@@ -526,7 +527,7 @@ export class Sim {
         if (this.componentDragFrom) {
             const cmds = []
             for (let c of this.selected) {
-                const dropPoint = c.pos.add(c.dragOffset!).snap(20)
+                const dropPoint = c.pos.add(c.dragOffset!).snap(20, new Vec2(0, 10))
                 if (!this.pointInsideBoard(dropPoint)) {
                     cmds.push(new RemoveComponentsCommand([c]))
                 } else if (c.dropped) {

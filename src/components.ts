@@ -10,6 +10,7 @@ export interface Component {
     dragOffset: Vec2 | null
     selected: boolean
     dropped: boolean
+    movable: boolean
 
     id: string
 
@@ -63,22 +64,29 @@ export abstract class Gate implements Component {
     dropped: boolean = false
     selected: boolean = false
     id: string
+    movable: boolean = true
 
-    constructor(pos: Vec2, id: string, inputNames: string[], outputNames: string[], width = 60) {
+    constructor(pos: Vec2, id: string, inputNames: string[], outputNames: string[], width = 40) {
         this.pos = pos
         this.id = id
 
         // Determine height based on max of input/output count
         const n = Math.max(inputNames.length, outputNames.length)
-        const height = Math.max(40, n * 30)
+        const height = Math.max(20, 20 + (n - 1) * 20)
         this.size = new Vec2(width, height)
 
         // Assign ports
         this.inputs = inputNames.map((id, i) =>
-            new Port(id, new Vec2(0, (i + 1) * this.size.y / (inputNames.length + 1)), this, PortKind.Input, i)
+            new Port(id, new Vec2(0, 10 + 20 * i), this, PortKind.Input, i)
         )
         this.outputs = outputNames.map((id, i) =>
-            new Port(id, new Vec2(this.size.x, (i + 1) * this.size.y / (outputNames.length + 1)), this, PortKind.Output, i)
+            new Port(
+                id,
+                new Vec2(this.size.x, 10 + 20 * i),
+                this,
+                PortKind.Output,
+                i
+            )
         )
     }
 
@@ -117,23 +125,24 @@ export abstract class Gate implements Component {
         ctx.textBaseline = "middle";
         ctx.fillText(this.getLabel(), realPos.x + this.size.x / 2, realPos.y + this.size.y / 2);
 
-        // Draw ports
+        this.drawPorts(ctx)
+    }
+
+    drawPorts(ctx: CanvasRenderingContext2D) {
+        const opacity = this.dragOffset ? "88" : "ff"
         const size = 3;
         for (const p of [...this.inputs, ...this.outputs]) {
             const world = p.getWorldPos();
             ctx.beginPath();
             ctx.arc(world.x, world.y, size, 0, Math.PI * 2)
 
-            ctx.fillStyle = "#0000"
+            ctx.fillStyle = "#ebebeb"
             ctx.strokeStyle = "#555"
             if (p.wires.length > 0) {
                 ctx.fillStyle = p.value === 1 ? ("#4caf50" + opacity) : ("#555555" + opacity);
                 ctx.strokeStyle = p.value === 1 ? ("#4caf50" + opacity) : ("#555555" + opacity);
-                ctx.fill();
             }
-            // TODO: If port is hovered:
-            // ctx.strokeStyle = "#4aa3ff";
-            // ctx.lineWidth = 2;
+            ctx.fill();
             ctx.stroke();
         }
     }
@@ -290,101 +299,6 @@ export class XnorGate extends Gate {
     }
 }
 
-export class Button extends Gate implements MouseInteractable {
-    pressed = false
-
-    constructor(pos: Vec2) {
-        super(pos, "Button", [], ["out"])
-    }
-
-    clone() {
-        return new Button(this.pos)
-    }
-
-    update() {
-        this.outputs[0].value = this.pressed ? 1 : 0
-    }
-
-    draw(ctx: CanvasRenderingContext2D) {
-        super.draw(ctx)
-
-        ctx.fillStyle = this.pressed ? "#2f28" : "#aaa";
-        ctx.strokeStyle = "#757575ff";
-        ctx.fillRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
-        ctx.strokeRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
-
-        // Draw label
-        ctx.fillStyle = "#222";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(this.getLabel(), this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2);
-    }
-
-    getLabel(): string {
-        return 'BTN'
-    }
-
-    contains(mouse: Vec2) {
-        return mouse.x >= this.dragPos().x + 6 && mouse.x <= this.dragPos().x + this.size.x - 12 &&
-            mouse.y >= this.dragPos().y + 6 && mouse.y <= this.dragPos().y + this.size.y - 12
-    }
-
-    onMouseDown() {
-        this.pressed = true
-    }
-
-    onMouseUp() {
-        this.pressed = false
-    }
-}
-
-export class Switch extends Gate implements MouseInteractable {
-    pressed = false
-
-    constructor(pos: Vec2) {
-        super(pos, "Switch", [], ["out"])
-    }
-
-    clone() {
-        return new Switch(this.pos)
-    }
-
-    update() {
-        this.outputs[0].value = this.pressed ? 1 : 0
-    }
-
-    draw(ctx: CanvasRenderingContext2D) {
-        super.draw(ctx)
-
-        ctx.fillStyle = this.pressed ? "#2f28" : "#aaa";
-        ctx.strokeStyle = "#757575ff";
-        ctx.fillRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
-        ctx.strokeRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
-
-        // Draw label
-        ctx.fillStyle = "#222";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(this.getLabel(), this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2);
-    }
-
-    getLabel(): string {
-        return 'SWITCH'
-    }
-
-    contains(mouse: Vec2) {
-        return mouse.x >= this.dragPos().x + 6 && mouse.x <= this.dragPos().x + this.size.x - 12 &&
-            mouse.y >= this.dragPos().y + 6 && mouse.y <= this.dragPos().y + this.size.y - 12
-    }
-
-    onMouseDown() {
-        this.pressed = !this.pressed
-    }
-
-    onMouseUp() {
-    }
-}
-
 export class Clock extends Gate {
     private counter = 4
     state = 0
@@ -478,35 +392,84 @@ export class TFlipFlop extends Gate {
     }
 }
 
-export class Led extends Gate {
+export class InputPin extends Gate implements MouseInteractable {
+    pressed = false
 
     constructor(pos: Vec2) {
-        super(pos, "Led", ["in"], [])
+        super(pos, "InputPin", [], ["out"], 20)
+        this.size = new Vec2(20, 20)
     }
 
     clone() {
-        return new Led(this.pos)
+        return new InputPin(this.pos)
     }
 
     update() {
+        this.outputs[0].value = this.pressed ? 1 : 0
     }
 
     draw(ctx: CanvasRenderingContext2D) {
-        super.draw(ctx)
-
-        ctx.fillStyle = (this.inputs[0].value === 1) ? "#f228" : "#aaa";
+        ctx.fillStyle = this.pressed ? "#2f28" : "#aaa";
         ctx.strokeStyle = "#757575ff";
-        ctx.fillRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
-        ctx.strokeRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
+        ctx.strokeRect(this.dragPos().x, this.dragPos().y, this.size.x, this.size.y);
 
-        // Draw label
-        ctx.fillStyle = "#222";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(this.getLabel(), this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2);
+        ctx.beginPath();
+        ctx.arc(this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2, this.size.x / 2.9, 0, Math.PI * 2)
+
+        ctx.strokeStyle = "#555"
+        ctx.fill();
+        ctx.stroke();
+
+        super.drawPorts(ctx)
     }
 
     getLabel(): string {
-        return 'LED'
+        return 'IN'
+    }
+
+    contains(mouse: Vec2) {
+        return mouse.x >= this.pos.x && mouse.x < this.pos.x + this.size.x &&
+            mouse.y >= this.pos.y && mouse.y < this.pos.y + this.size.y
+    }
+
+    onMouseDown() {
+        this.pressed = !this.pressed
+    }
+
+    onMouseUp() {
+    }
+}
+
+export class OutputPin extends Gate {
+    constructor(pos: Vec2) {
+        super(pos, "OutputPin", ["in"], [], 20)
+        this.size = new Vec2(20, 20)
+    }
+
+    clone() {
+        return new OutputPin(this.pos)
+    }
+
+    update() { }
+
+    draw(ctx: CanvasRenderingContext2D) {
+        ctx.fillStyle = (this.inputs[0].value === 1) ? "#2f28" : "#aaa";
+        ctx.strokeStyle = "#757575ff";
+        ctx.beginPath();
+        ctx.arc(this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2, this.size.x / 2.9, 0, Math.PI * 2)
+        ctx.stroke();
+
+        ctx.beginPath();
+        ctx.arc(this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2, this.size.x / 2.9, 0, Math.PI * 2)
+
+        ctx.strokeStyle = "#555"
+        ctx.fill();
+        ctx.stroke();
+
+        super.drawPorts(ctx)
+    }
+
+    getLabel(): string {
+        return 'OUT'
     }
 }
