@@ -30,6 +30,9 @@ export class History {
         cmd.do(sim)
         this.undoStack.push(cmd)
     }
+
+    undoDepth(): number { return this.undoStack.length }
+    redoDepth(): number { return this.redoStack.length }
 }
 
 export class CompositeCommand implements Command {

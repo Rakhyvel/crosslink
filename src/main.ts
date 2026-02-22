@@ -29,12 +29,16 @@ const startButton = document.getElementById("start")! as HTMLButtonElement
 const stopButton = document.getElementById("stop")! as HTMLButtonElement
 const stepButton = document.getElementById("step")! as HTMLButtonElement
 const clearButton = document.getElementById("clear")! as HTMLButtonElement
+const undoButton = document.getElementById("undo")! as HTMLButtonElement
+const redoButton = document.getElementById("redo")! as HTMLButtonElement
 const slider = document.getElementById("tick-slider") as HTMLInputElement
 
 function frame() {
     startButton.disabled = sim.enabled
     stopButton.disabled = !sim.enabled
     stepButton.disabled = sim.enabled
+    undoButton.disabled = sim.history.undoDepth() == 0
+    redoButton.disabled = sim.history.redoDepth() == 0
 
     sim.updateIfEnabled()
     sim.draw()
@@ -119,6 +123,14 @@ stepButton.addEventListener("click", () => {
 
 clearButton.addEventListener("click", () => {
     sim.clear()
+})
+
+undoButton.addEventListener("click", () => {
+    sim.undo()
+})
+
+redoButton.addEventListener("click", () => {
+    sim.redo()
 })
 
 slider.addEventListener("input", () => {

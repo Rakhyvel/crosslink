@@ -97,7 +97,7 @@ export abstract class Gate implements Component {
         if (this.selected) {
             ctx.fillStyle = "#4aa3ff" + opacity
             ctx.beginPath();
-            ctx.roundRect(realPos.x - 2, realPos.y - 2, this.size.x + 4, this.size.y + 4, 8);
+            ctx.fillRect(realPos.x - 2, realPos.y - 2, this.size.x + 4, this.size.y + 4);
             ctx.fill();
         }
 
@@ -107,9 +107,8 @@ export abstract class Gate implements Component {
         ctx.lineWidth = 0.5;
 
         ctx.beginPath();
-        ctx.roundRect(realPos.x, realPos.y, this.size.x, this.size.y, 6);
-        ctx.fill();
-        ctx.stroke();
+        ctx.fillRect(realPos.x, realPos.y, this.size.x, this.size.y);
+        ctx.strokeRect(realPos.x, realPos.y, this.size.x, this.size.y);
 
         // Draw label
         ctx.fillStyle = "#222222" + opacity;
@@ -311,14 +310,14 @@ export class Button extends Gate implements MouseInteractable {
 
         ctx.fillStyle = this.pressed ? "#2f28" : "#aaa";
         ctx.strokeStyle = "#757575ff";
-        ctx.fillRect(this.pos.x + 6, this.pos.y + 6, this.size.x - 12, this.size.y - 12);
-        ctx.strokeRect(this.pos.x + 6, this.pos.y + 6, this.size.x - 12, this.size.y - 12);
+        ctx.fillRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
+        ctx.strokeRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
 
         // Draw label
         ctx.fillStyle = "#222";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(this.getLabel(), this.pos.x + this.size.x / 2, this.pos.y + this.size.y / 2);
+        ctx.fillText(this.getLabel(), this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2);
     }
 
     getLabel(): string {
@@ -326,8 +325,8 @@ export class Button extends Gate implements MouseInteractable {
     }
 
     contains(mouse: Vec2) {
-        return mouse.x >= this.pos.x + 6 && mouse.x <= this.pos.x + this.size.x - 12 &&
-            mouse.y >= this.pos.y + 6 && mouse.y <= this.pos.y + this.size.y - 12
+        return mouse.x >= this.dragPos().x + 6 && mouse.x <= this.dragPos().x + this.size.x - 12 &&
+            mouse.y >= this.dragPos().y + 6 && mouse.y <= this.dragPos().y + this.size.y - 12
     }
 
     onMouseDown() {
@@ -359,14 +358,14 @@ export class Switch extends Gate implements MouseInteractable {
 
         ctx.fillStyle = this.pressed ? "#2f28" : "#aaa";
         ctx.strokeStyle = "#757575ff";
-        ctx.fillRect(this.pos.x + 6, this.pos.y + 6, this.size.x - 12, this.size.y - 12);
-        ctx.strokeRect(this.pos.x + 6, this.pos.y + 6, this.size.x - 12, this.size.y - 12);
+        ctx.fillRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
+        ctx.strokeRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
 
         // Draw label
         ctx.fillStyle = "#222";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(this.getLabel(), this.pos.x + this.size.x / 2, this.pos.y + this.size.y / 2);
+        ctx.fillText(this.getLabel(), this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2);
     }
 
     getLabel(): string {
@@ -374,8 +373,8 @@ export class Switch extends Gate implements MouseInteractable {
     }
 
     contains(mouse: Vec2) {
-        return mouse.x >= this.pos.x + 6 && mouse.x <= this.pos.x + this.size.x - 12 &&
-            mouse.y >= this.pos.y + 6 && mouse.y <= this.pos.y + this.size.y - 12
+        return mouse.x >= this.dragPos().x + 6 && mouse.x <= this.dragPos().x + this.size.x - 12 &&
+            mouse.y >= this.dragPos().y + 6 && mouse.y <= this.dragPos().y + this.size.y - 12
     }
 
     onMouseDown() {
@@ -497,14 +496,14 @@ export class Led extends Gate {
 
         ctx.fillStyle = (this.inputs[0].value === 1) ? "#f228" : "#aaa";
         ctx.strokeStyle = "#757575ff";
-        ctx.fillRect(this.pos.x + 6, this.pos.y + 6, this.size.x - 12, this.size.y - 12);
-        ctx.strokeRect(this.pos.x + 6, this.pos.y + 6, this.size.x - 12, this.size.y - 12);
+        ctx.fillRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
+        ctx.strokeRect(this.dragPos().x + 6, this.dragPos().y + 6, this.size.x - 12, this.size.y - 12);
 
         // Draw label
         ctx.fillStyle = "#222";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(this.getLabel(), this.pos.x + this.size.x / 2, this.pos.y + this.size.y / 2);
+        ctx.fillText(this.getLabel(), this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2);
     }
 
     getLabel(): string {

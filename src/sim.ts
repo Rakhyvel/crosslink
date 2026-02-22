@@ -63,7 +63,7 @@ export class Sim {
     private _enabled: boolean = false
 
     pitch: number = 20
-    size: Vec2 = new Vec2(32, 26).scale(this.pitch)
+    size: Vec2 = new Vec2(27, 22).scale(this.pitch)
 
     selected: Component[] = []
 
@@ -357,10 +357,12 @@ export class Sim {
     }
 
     undo() {
+        this.enabled = false
         this.history.undo(this)
     }
 
     redo() {
+        this.enabled = false
         this.history.redo(this)
     }
 
@@ -631,8 +633,8 @@ export class Sim {
         this.ctx.fillStyle = "#ebebeb"
         this.ctx.strokeStyle = "#ebebeb";
         this.ctx.beginPath();
-        this.ctx.roundRect(0, 0, this.size.x, this.size.y, 6);
-        this.ctx.fill();
+        this.ctx.fillRect(0, 0, this.size.x, this.size.y);
+        // this.ctx.fill();
         this.ctx.stroke();
 
         this.ctx.strokeStyle = "#e0e0e0";
@@ -640,15 +642,15 @@ export class Sim {
 
         for (let x = this.pitch; x < this.size.x; x += this.pitch) {
             this.ctx.beginPath();
-            this.ctx.moveTo(x, 0);
-            this.ctx.lineTo(x, this.size.y);
+            this.ctx.moveTo(x, this.pitch);
+            this.ctx.lineTo(x, this.size.y - this.pitch);
             this.ctx.stroke();
         }
 
         for (let y = this.pitch; y < this.size.y; y += this.pitch) {
             this.ctx.beginPath();
-            this.ctx.moveTo(0, y);
-            this.ctx.lineTo(this.size.x, y);
+            this.ctx.moveTo(this.pitch, y);
+            this.ctx.lineTo(this.size.x - this.pitch, y);
             this.ctx.stroke();
         }
     }
