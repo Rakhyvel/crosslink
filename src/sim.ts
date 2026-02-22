@@ -398,7 +398,7 @@ export class Sim {
 
     startComponentDrag() {
         for (const c of this.selected) {
-            c.isDragged = true
+            c.dragOffset = new Vec2(0, 0)
         }
         this.componentDragFrom = this.worldPos
     }
@@ -409,7 +409,7 @@ export class Sim {
         if (comp) {
             this.enabled = false
             this.componentDragFrom = this.worldPos.add(comp.size.scale(0.5))
-            comp.isDragged = true
+            comp.dragOffset = new Vec2(0, 0)
             this.history.execute(new AddComponentsCommand([comp]), this)
         }
     }
@@ -470,9 +470,8 @@ export class Sim {
 
         if (this.selected.length > 0 && this.componentDragFrom) {
             for (const c of this.selected) {
-                c.pos = c.pos.add(this.worldPos.sub(this.componentDragFrom))
+                c.dragOffset = this.worldPos.sub(this.componentDragFrom)
             }
-            this.componentDragFrom = this.worldPos
             return
         }
 
@@ -523,14 +522,17 @@ export class Sim {
         }
 
         if (this.componentDragFrom) {
+            const removedComponents = []
             for (let c of this.selected) {
-                c.pos = c.pos.snap(20)
-
-                if (!this.pointInsideBoard(c.pos)) {
-                    this.removeComponent(c)
+                const dropPoint = c.pos.add(c.dragOffset!).snap(20)
+                if (!this.pointInsideBoard(dropPoint)) {
+                    removedComponents.push(c)
+                } else {
+                    c.pos = dropPoint
                 }
-                c.isDragged = false
+                c.dragOffset = null
             }
+            this.history.execute(new RemoveComponentsCommand(removedComponents), this)
             this.componentDragFrom = null
             return
         }

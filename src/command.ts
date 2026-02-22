@@ -76,7 +76,7 @@ export class RemoveComponentsCommand implements Command {
     }
 }
 
-export class MoveComponentCommand implements Command {
+export class MoveComponentsCommand implements Command {
     constructor(
         private components: Component[],
         private from: Vec2[],

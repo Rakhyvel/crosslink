@@ -7,12 +7,13 @@ export interface Component {
     inputs: Port[]
     outputs: Port[]
 
-    isDragged: boolean
+    dragOffset: Vec2 | null
     selected: boolean
 
     id: string
 
     clone(): Component
+    dragPos(): Vec2
     update(): void
     draw(ctx: CanvasRenderingContext2D): void
 }
@@ -42,7 +43,7 @@ export class Port {
     wires: Wire[] = []
 
     getWorldPos(): Vec2 {
-        return this.parent.pos.add(this.offset)
+        return this.parent.dragPos().add(this.offset)
     }
 }
 
@@ -57,7 +58,7 @@ export abstract class Gate implements Component {
     size: Vec2
     inputs: Port[] = []
     outputs: Port[] = []
-    isDragged: boolean = false
+    dragOffset: Vec2 | null = null
     selected: boolean = false
     id: string
 
@@ -79,13 +80,22 @@ export abstract class Gate implements Component {
         )
     }
 
+    dragPos(): Vec2 {
+        let retval = this.pos
+        if (this.dragOffset) {
+            retval = retval.add(this.dragOffset)
+        }
+        return retval
+    }
+
     draw(ctx: CanvasRenderingContext2D) {
-        const opacity = this.isDragged ? "88" : "ff"
+        const opacity = this.dragOffset ? "88" : "ff"
+        const realPos = this.dragPos()
 
         if (this.selected) {
             ctx.fillStyle = "#4aa3ff" + opacity
             ctx.beginPath();
-            ctx.roundRect(this.pos.x - 2, this.pos.y - 2, this.size.x + 4, this.size.y + 4, 8);
+            ctx.roundRect(realPos.x - 2, realPos.y - 2, this.size.x + 4, this.size.y + 4, 8);
             ctx.fill();
         }
 
@@ -95,7 +105,7 @@ export abstract class Gate implements Component {
         ctx.lineWidth = 0.5;
 
         ctx.beginPath();
-        ctx.roundRect(this.pos.x, this.pos.y, this.size.x, this.size.y, 6);
+        ctx.roundRect(realPos.x, realPos.y, this.size.x, this.size.y, 6);
         ctx.fill();
         ctx.stroke();
 
@@ -104,7 +114,7 @@ export abstract class Gate implements Component {
         ctx.font = "12px system-ui, sans-serif";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(this.getLabel(), this.pos.x + this.size.x / 2, this.pos.y + this.size.y / 2);
+        ctx.fillText(this.getLabel(), realPos.x + this.size.x / 2, realPos.y + this.size.y / 2);
 
         // Draw ports
         const size = 3;
