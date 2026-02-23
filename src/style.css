@@ -18,6 +18,10 @@ body {
   color: var(--text);
 }
 
+h1 {
+  font-family: "caveat";
+}
+
 /* ROOT LAYOUT */
 #root {
   display: flex;
@@ -168,4 +172,32 @@ body {
 #sim-canvas.build {
   box-shadow: none;
   transition: box-shadow 0.3s ease;
+}
+
+#modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.5);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+#modalContent {
+  background: #fff;
+  padding: 20px;
+  border-radius: 8px;
+  min-width: 250px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+#modalButtons {
+  margin-top: 10px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

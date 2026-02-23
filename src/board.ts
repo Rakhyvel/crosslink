@@ -1,4 +1,4 @@
-import { PortKind, type Component, type MouseInteractable, type Port, type Wire } from "./components"
+import { createComponentFromType, InputPin, PortKind, Wire, type Component, type MouseInteractable, type Port } from "./components"
 import { Vec2 } from "./vec"
 
 const pitch: number = 20
@@ -7,6 +7,21 @@ export enum BoardSize {
     Small,
     Medium,
     Large
+}
+
+export type Serialized = {
+    components: {
+        id: string
+        type: string
+        name: string | undefined
+        position: { x: number, y: number }
+    }[]
+    wires: {
+        fromComponentId: string
+        fromPortIndex: number
+        toComponentId: string
+        toPortIndex: number
+    }[]
 }
 
 const boardSizes: Record<BoardSize, Vec2> = {
@@ -20,6 +35,40 @@ export class Board {
 
     constructor(boardSize: BoardSize, public name: string, private components: Component[] = [], private wires: Wire[] = []) {
         this.size = boardSizes[boardSize]
+    }
+
+    static fromSerialized(data: Serialized, custom: Map<string, Serialized> | null = null): Board {
+        const retval = new Board(BoardSize.Small, "")
+
+        // Instantiate components and map old IDs -> new instances
+        const idMap = new Map<string, Component>();
+        const components = new Array<Component>();
+        for (const c of data.components) {
+            const instance: Component | null = createComponentFromType(c.type, new Vec2(c.position.x, c.position.y).add(new Vec2(20, 20)), c.name, custom);
+            if (!instance) {
+                throw "bad id: " + c.type
+            }
+
+            idMap.set(c.id, instance);
+            instance.dropped = true;
+            components.push(instance)
+        }
+        retval.addComponents(components)
+
+        // Instantiate wires
+        for (const w of data.wires) {
+            const fromComp = idMap.get(w.fromComponentId);
+            const toComp = idMap.get(w.toComponentId);
+
+            if (!fromComp || !toComp) continue; // safety
+
+            const fromPort = fromComp.outputs[w.fromPortIndex];
+            const toPort = toComp.inputs[w.toPortIndex];
+
+            retval.addWire(new Wire(fromPort, toPort));
+        }
+
+        return retval
     }
 
     addComponents(cs: Component[]) {
@@ -41,6 +90,14 @@ export class Board {
         }
 
         this.components = this.components.filter(x => x !== component)
+    }
+
+    getInputPins(): InputPin[] {
+        return this.components.filter(c => c.id === "InputPin").sort((a, b) => a.pos.y - b.pos.y) as InputPin[]
+    }
+
+    getOutputPins() {
+        return this.components.filter(c => c.id === "OutputPin").sort((a, b) => a.pos.y - b.pos.y)
     }
 
     forEachComponent(f: (arg0: Component, arg1: number) => void) {
@@ -124,9 +181,45 @@ export class Board {
         return (p.x >= 0 && p.x < this.size.x && p.y >= 0 && p.y < this.size.y)
     }
 
+    serialize(f: (value: Component) => Boolean): Serialized {
+        const components = this.components.filter(f)
+        const data: Serialized = {
+            components: [],
+            wires: []
+        };
+        if (components.length === 0) return data;
+
+        const ids = new Map<Component, string>();
+
+        // Assign temporary IDs
+        for (const c of components) {
+            const id = crypto.randomUUID();
+            ids.set(c, id);
+
+            data.components.push({
+                id,
+                type: c.id,
+                name: c.name,
+                position: { x: c.pos.x, y: c.pos.y },
+            });
+        }
+
+        // Store only internal wires
+        for (const w of this.getInternalWires(components)) {
+            data.wires.push({
+                fromComponentId: ids.get(w.from.parent)!,
+                fromPortIndex: w.from.index,
+                toComponentId: ids.get(w.to.parent)!,
+                toPortIndex: w.to.index
+            });
+        }
+
+        return data;
+    }
+
     interactComponents(worldPos: Vec2) {
         for (const c of this.components) {
-            if ("onMouseDown" in c && "onMouseUp" in c && "contains" in c) {
+            if ("onMouseDown" in c && "contains" in c) {
                 const interactive = c as MouseInteractable
                 if (interactive.contains(worldPos)) {
                     interactive.onMouseDown()

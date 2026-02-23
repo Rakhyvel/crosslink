@@ -1,16 +1,7 @@
 import './style.css'
 
-import { type MouseInteractable } from './components.ts'
 import { Sim } from './sim.ts'
 import { Vec2 } from './vec.ts'
-
-// TODO:
-// - [x] connections
-// - [x] and, or, not components
-// - [x] dragging with snap
-// - [x] new wire/reset wire from dragging from port
-// - [x] button/switch, LEDs components
-// - [x] new component from dragging from palette
 
 const canvas = document.getElementById("sim-canvas") as HTMLCanvasElement
 
@@ -67,20 +58,17 @@ window.addEventListener("mousemove", (e) => {
 
 window.addEventListener("mouseup", _ => {
     sim.handleMouseUp()
-
-    for (const c of sim.components) {
-        if ("onMouseDown" in c && "onMouseUp" in c && "contains" in c) {
-            const interactive = c as MouseInteractable
-            interactive.onMouseUp()
-        }
-    }
 })
 
 window.addEventListener("keydown", async (e: KeyboardEvent) => {
     if (e.ctrlKey) {
         e.preventDefault();
-        if (e.key.toLowerCase() === "c") {
+        if (e.key.toLowerCase() == "a") {
+            sim.selectAll()
+        } else if (e.key.toLowerCase() === "c") {
             await sim.copySelected();
+        } else if (e.key.toLowerCase() === "s") {
+            await sim.save()
         } else if (e.key.toLowerCase() === "v") {
             try {
                 const text = await navigator.clipboard.readText();
@@ -88,12 +76,10 @@ window.addEventListener("keydown", async (e: KeyboardEvent) => {
             } catch (err) {
                 console.warn("Clipboard does not contain valid circuit data", err);
             }
-        } else if (e.key.toLowerCase() == "a") {
-            sim.selectAll()
-        } else if (e.key.toLowerCase() == "z") {
-            sim.undo()
         } else if (e.key.toLowerCase() == "y") {
             sim.redo()
+        } else if (e.key.toLowerCase() == "z") {
+            sim.undo()
         }
     } else if (e.key === "Backspace" || e.key === "Delete") {
         e.preventDefault()
@@ -101,19 +87,6 @@ window.addEventListener("keydown", async (e: KeyboardEvent) => {
     } else if (e.key === " ") {
         sim.enabled = !sim.enabled
     }
-});
-
-document.querySelectorAll(".palette-item").forEach(el => {
-    el.addEventListener("mousedown", _ => {
-        sim.startPaletteDrag((el as HTMLElement).dataset.type!)
-    })
-})
-
-document.querySelectorAll(".palette-header").forEach(header => {
-    header.addEventListener("click", () => {
-        const section = header.parentElement!;
-        section.classList.toggle("open");
-    });
 });
 
 startButton.addEventListener("click", () => {

@@ -1,7 +1,9 @@
-import { AndGate, NotGate, OrGate, Port, XorGate, PortKind, Wire, type Component, NandGate, NorGate, XnorGate, Clock, DFlipFlop, TFlipFlop, InputPin, OutputPin } from './components.ts'
+import { Port, PortKind, Wire, type Component, createComponentFromType } from './components.ts'
 import { Vec2 } from './vec.ts'
 import { AddComponentsCommand, AddWiresCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand, RemoveWiresCommand } from './command.ts'
-import { Board, BoardSize } from './board.ts'
+import { Board, BoardSize, type Serialized } from './board.ts'
+import { promptModal } from './modal.ts'
+import { Palette } from './palette.ts'
 
 interface DraggingComponent {
     fromPos: Vec2
@@ -24,22 +26,12 @@ interface Selection {
     end: Vec2
 }
 
-type ClipboardData = {
-    components: {
-        id: string
-        type: string
-        position: { x: number, y: number }
-    }[]
-    wires: {
-        fromComponentId: string
-        fromPortIndex: number
-        toComponentId: string
-        toPortIndex: number
-    }[]
-}
-
 export class Sim {
     board: Board
+
+    // Maybe could be owned by a Palette object?
+    customComponents: Map<string, Serialized> = new Map<string, Serialized>()
+    palette: Palette
 
     draggingComponent: DraggingComponent | null = null
     componentDragFrom: Vec2 | null = null
@@ -70,6 +62,7 @@ export class Sim {
         this.canvas = canvas
         this.ctx = canvas.getContext("2d")!
         this.tickMs = tickMs
+        this.palette = new Palette("palette", this)
 
         canvas.addEventListener("wheel", e => {
             const zoomFactor = 1.1
@@ -224,56 +217,21 @@ export class Sim {
         return false
     }
 
-    buildClipboardData(): ClipboardData {
-        const selected = this.selected;
-        const data: ClipboardData = {
-            components: [],
-            wires: []
-        };
-        if (selected.length === 0) return data;
-
-        const ids = new Map<Component, string>();
-
-        // Assign temporary IDs
-        for (const c of selected) {
-            const id = crypto.randomUUID();
-            ids.set(c, id);
-
-            data.components.push({
-                id,
-                type: c.id,
-                position: { x: c.pos.x, y: c.pos.y },
-            });
-        }
-
-        // Store only internal wires
-        for (const w of this.board.getInternalWires(selected)) {
-            data.wires.push({
-                fromComponentId: ids.get(w.from.parent)!,
-                fromPortIndex: w.from.index,
-                toComponentId: ids.get(w.to.parent)!,
-                toPortIndex: w.to.index
-            });
-        }
-
-        return data;
-    }
-
     async copySelected() {
-        const data = this.buildClipboardData();
+        const data = this.board.serialize(c => c.selected);
         const json = JSON.stringify(data, null, 2);
 
         await navigator.clipboard.writeText(json);
     }
 
     paste(text: string) {
-        const data: ClipboardData = JSON.parse(text);
+        const data: Serialized = JSON.parse(text);
 
         // Instantiate components and map old IDs -> new instances
         const idMap = new Map<string, Component>();
         const components = new Array<Component>();
         for (const c of data.components) {
-            const instance: Component | null = this.createComponentFromType(c.type, new Vec2(c.position.x, c.position.y).add(new Vec2(20, 20)));
+            const instance: Component | null = createComponentFromType(c.type, new Vec2(c.position.x, c.position.y).add(new Vec2(20, 20)), c.name, this.customComponents);
             if (!instance) {
                 throw "bad id: " + c.type
             }
@@ -308,22 +266,13 @@ export class Sim {
         this.history.redo(this)
     }
 
-    createComponentFromType(type: string, pos: Vec2) {
-        switch (type) {
-            case "InputPin": return new InputPin(pos)
-            case "OutputPin": return new OutputPin(pos)
-            case "NotGate": return new NotGate(pos)
-            case "AndGate": return new AndGate(pos)
-            case "OrGate": return new OrGate(pos)
-            case "XorGate": return new XorGate(pos)
-            case "NandGate": return new NandGate(pos)
-            case "NorGate": return new NorGate(pos)
-            case "XnorGate": return new XnorGate(pos)
-            case "Clock": return new Clock(pos)
-            case "DFlipFlop": return new DFlipFlop(pos)
-            case "TFlipFlop": return new TFlipFlop(pos)
-            default: return null
-        }
+    async save() {
+        const name = await promptModal("Component name:") || "untitled"
+        const data = this.board.serialize(_ => true);
+
+        this.customComponents.set(name, data)
+
+        this.palette.addItem("Custom", name, "CustomComponent")
     }
 
     startWireDrag(port: Port) {
@@ -345,8 +294,8 @@ export class Sim {
         this.componentDragFrom = this.worldPos
     }
 
-    startPaletteDrag(id: string) {
-        let comp: Component | null = this.createComponentFromType(id, this.worldPos)
+    startPaletteDrag(id: string, name: string | undefined) {
+        let comp: Component | null = createComponentFromType(id, this.worldPos, name, this.customComponents)
 
         if (comp) {
             this.enabled = false

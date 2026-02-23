@@ -1,3 +1,4 @@
+import { Board, type Serialized } from './board.ts'
 import { Vec2 } from './vec.ts'
 
 export interface Component {
@@ -13,6 +14,7 @@ export interface Component {
     movable: boolean
 
     id: string
+    name: string
 
     clone(): Component
     dragPos(): Vec2
@@ -55,6 +57,31 @@ export class Wire {
 
 export type Signal = 0 | 1
 
+export function createComponentFromType(type: string, pos: Vec2, name: string | null = null, custom: Map<string, Serialized> | null = null) {
+    switch (type) {
+        case "InputPin": return new InputPin(pos)
+        case "OutputPin": return new OutputPin(pos)
+        case "NotGate": return new NotGate(pos)
+        case "AndGate": return new AndGate(pos)
+        case "OrGate": return new OrGate(pos)
+        case "XorGate": return new XorGate(pos)
+        case "NandGate": return new NandGate(pos)
+        case "NorGate": return new NorGate(pos)
+        case "XnorGate": return new XnorGate(pos)
+        case "Clock": return new Clock(pos)
+        case "SRLatch": return new SRLatch(pos)
+        case "DFlipFlop": return new DFlipFlop(pos)
+        case "TFlipFlop": return new TFlipFlop(pos)
+        case "CustomComponent":
+            if (custom) {
+                const data = custom.get(name!)!
+                return new CustomComponent(pos, name!, data, custom)
+            }
+            return null
+        default: return null
+    }
+}
+
 export abstract class Gate implements Component {
     pos: Vec2
     size: Vec2
@@ -64,6 +91,7 @@ export abstract class Gate implements Component {
     dropped: boolean = false
     selected: boolean = false
     id: string
+    name: string = ""
     movable: boolean = true
 
     constructor(pos: Vec2, id: string, inputNames: string[], outputNames: string[], width = 40) {
@@ -155,7 +183,6 @@ export abstract class Gate implements Component {
 export interface MouseInteractable {
     contains(mouse: Vec2): boolean
     onMouseDown(): void
-    onMouseUp(): void
 }
 
 export class NotGate extends Gate {
@@ -328,6 +355,43 @@ export class Clock extends Gate {
     }
 }
 
+export class SRLatch extends Gate {
+    private q = 0
+
+    constructor(pos: Vec2) {
+        super(pos, "SRLatch", ["r", "s"], ["Q", "!Q"])
+    }
+
+    clone() {
+        return new SRLatch(this.pos)
+    }
+
+    update() {
+        const r = this.inputs[0].value
+        const s = this.inputs[1].value
+
+        // Edge case, if both are on then q and !q aren't actually opposites
+        if (r === 1 && s === 1) {
+            this.outputs[0].value = 0
+            this.outputs[1].value = 0
+            return
+        }
+
+        if (r === 1) {
+            this.q = 0
+        } else if (s === 1) {
+            this.q = 1
+        }
+
+        this.outputs[0].value = this.q as Signal
+        this.outputs[1].value = this.q ? 0 : 1
+    }
+
+    getLabel(): string {
+        return 'SRL'
+    }
+}
+
 export class DFlipFlop extends Gate {
     private q = 0
     private prevClock = 0
@@ -404,6 +468,10 @@ export class InputPin extends Gate implements MouseInteractable {
         return new InputPin(this.pos)
     }
 
+    setValue(value: boolean) {
+        this.pressed = value
+    }
+
     update() {
         this.outputs[0].value = this.pressed ? 1 : 0
     }
@@ -411,6 +479,7 @@ export class InputPin extends Gate implements MouseInteractable {
     draw(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = this.pressed ? "#2f28" : "#aaa";
         ctx.strokeStyle = "#757575ff";
+        ctx.lineWidth = 0.5;
         ctx.strokeRect(this.dragPos().x, this.dragPos().y, this.size.x, this.size.y);
 
         ctx.beginPath();
@@ -435,9 +504,6 @@ export class InputPin extends Gate implements MouseInteractable {
     onMouseDown() {
         this.pressed = !this.pressed
     }
-
-    onMouseUp() {
-    }
 }
 
 export class OutputPin extends Gate {
@@ -455,6 +521,7 @@ export class OutputPin extends Gate {
     draw(ctx: CanvasRenderingContext2D) {
         ctx.fillStyle = (this.inputs[0].value === 1) ? "#2f28" : "#aaa";
         ctx.strokeStyle = "#757575ff";
+        ctx.lineWidth = 0.5;
         ctx.beginPath();
         ctx.arc(this.dragPos().x + this.size.x / 2, this.dragPos().y + this.size.y / 2, this.size.x / 2.9, 0, Math.PI * 2)
         ctx.stroke();
@@ -471,5 +538,45 @@ export class OutputPin extends Gate {
 
     getLabel(): string {
         return 'OUT'
+    }
+}
+
+export class CustomComponent extends Gate {
+    board: Board
+
+    constructor(pos: Vec2, name: string, private data: Serialized, private custom: Map<string, Serialized>) {
+        const inputs = data.components.filter(c => c.type === "InputPin")
+        const outputs = data.components.filter(c => c.type === "OutputPin")
+
+        super(pos, name, inputs.map((_, i) => "in" + i), outputs.map((_, i) => "out" + i))
+        this.name = name
+        this.board = Board.fromSerialized(data, custom)
+    }
+
+    clone() {
+        return new CustomComponent(this.pos, this.name, this.data, this.custom)
+    }
+
+    update() {
+        const inputComponents = this.board.getInputPins()
+        const outputComponents = this.board.getOutputPins()
+
+        // Set board input pins
+        this.inputs.forEach((input, i) => {
+            inputComponents[i].setValue(input.value === 1)
+        })
+
+        this.board.step()
+
+        console.log(this.board)
+
+        // Get output pins
+        for (let i = 0; i < outputComponents.length; i += 1) {
+            this.outputs[i].value = outputComponents[i].inputs[0].value
+        }
+    }
+
+    getLabel(): string {
+        return 'Custom'
     }
 }
