@@ -2,7 +2,7 @@ import { Port, PortKind, Wire, type Component, createComponentFromType } from '.
 import { Vec2 } from './vec.ts'
 import { AddComponentsCommand, AddWiresCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand, RemoveWiresCommand } from './command.ts'
 import { Board, BoardSize, type Serialized } from './board.ts'
-import { promptModal } from './modal.ts'
+import { promptModal, confirmSaveModal } from './modal.ts'
 import { Palette } from './palette.ts'
 
 interface DraggingComponent {
@@ -57,6 +57,8 @@ export class Sim {
     selected: Component[] = []
 
     history: History = new History()
+
+    inModal: boolean = false
 
     constructor(canvas: HTMLCanvasElement, tickMs: number) {
         this.canvas = canvas
@@ -138,9 +140,14 @@ export class Sim {
         this.board.removeWire(wire)
     }
 
-    clear() {
+    async clear() {
         this.enabled = false
+        
+        const canProceed = await this.confirmDiscardIfDirty()
+        if (!canProceed) return
+        
         this.board.clear()
+        this.history.clear()
     }
 
     clearSelected() {
@@ -267,12 +274,73 @@ export class Sim {
     }
 
     async save() {
-        const name = await promptModal("Component name:") || "untitled"
-        const data = this.board.serialize(_ => true);
+        if (this.customComponents.has(this.board.name)) {
+            this.saveUnderName(this.board.name)
+            return
+        }
 
+        const name = await this.promptForName()
+        if (!name) return
+
+        this.saveUnderName(name)
+    }
+
+    async saveAs() {
+        const name = await this.promptForName()
+        if (!name) return
+
+        this.saveUnderName(name)
+    }
+
+    async load(name: string) {
+        if (this.board.name === name) return
+
+        this.enabled = false
+
+        const canProceed = await this.confirmDiscardIfDirty()
+        if (!canProceed) return
+
+        const data = this.customComponents.get(name)
+        if (!data) return
+
+        this.history.clear()
+        this.board = Board.fromSerialized(data, name, this.customComponents)
+    }
+
+    private async promptForName(): Promise<string | null> {
+        this.inModal = true
+        const name = await promptModal("Component name:")
+        this.inModal = false
+        return name
+    }
+
+    private async confirmDiscardIfDirty(): Promise<boolean> {
+        if (this.history.undoDepth() === 0) {
+            return true
+        }
+
+        const choice = await confirmSaveModal(
+            "You have unsaved changes. Do you want to save before continuing?"
+        )
+
+        if (choice === "save") {
+            await this.save()
+            return true
+        }
+
+        if (choice === "discard") {
+            return true
+        }
+
+        return false
+    }
+
+    private saveUnderName(name: string) {
+        const data = this.board.serialize(_ => true)
         this.customComponents.set(name, data)
-
         this.palette.addItem("Custom", name, "CustomComponent")
+        this.board.name = name
+        this.load(name)
     }
 
     startWireDrag(port: Port) {
@@ -462,7 +530,6 @@ export class Sim {
         this.ctx.translate(-offset.x, -offset.y)
 
         this.board.draw(this.ctx)
-
 
         if (this.draggingWire) {
             const color = "#4af"

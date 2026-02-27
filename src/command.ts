@@ -33,6 +33,11 @@ export class History {
 
     undoDepth(): number { return this.undoStack.length }
     redoDepth(): number { return this.redoStack.length }
+
+    clear() {
+        this.undoStack = []
+        this.redoStack = []
+    }
 }
 
 export class CompositeCommand implements Command {

@@ -61,14 +61,17 @@ window.addEventListener("mouseup", _ => {
 })
 
 window.addEventListener("keydown", async (e: KeyboardEvent) => {
+    if (sim.inModal) return
     if (e.ctrlKey) {
         e.preventDefault();
         if (e.key.toLowerCase() == "a") {
             sim.selectAll()
         } else if (e.key.toLowerCase() === "c") {
             await sim.copySelected();
-        } else if (e.key.toLowerCase() === "s") {
+        } else if (e.key === "s") {
             await sim.save()
+        } else if (e.key === "S") {
+            await sim.saveAs()
         } else if (e.key.toLowerCase() === "v") {
             try {
                 const text = await navigator.clipboard.readText();
@@ -82,7 +85,6 @@ window.addEventListener("keydown", async (e: KeyboardEvent) => {
             sim.undo()
         }
     } else if (e.key === "Backspace" || e.key === "Delete") {
-        e.preventDefault()
         sim.clearSelected()
     } else if (e.key === " ") {
         sim.enabled = !sim.enabled

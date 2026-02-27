@@ -37,14 +37,14 @@ export class Board {
         this.size = boardSizes[boardSize]
     }
 
-    static fromSerialized(data: Serialized, custom: Map<string, Serialized> | null = null): Board {
-        const retval = new Board(BoardSize.Small, "")
+    static fromSerialized(data: Serialized, name: string, custom: Map<string, Serialized> | null = null): Board {
+        const retval = new Board(BoardSize.Small, name)
 
         // Instantiate components and map old IDs -> new instances
         const idMap = new Map<string, Component>();
         const components = new Array<Component>();
         for (const c of data.components) {
-            const instance: Component | null = createComponentFromType(c.type, new Vec2(c.position.x, c.position.y).add(new Vec2(20, 20)), c.name, custom);
+            const instance: Component | null = createComponentFromType(c.type, new Vec2(c.position.x, c.position.y), c.name, custom);
             if (!instance) {
                 throw "bad id: " + c.type
             }
@@ -122,6 +122,7 @@ export class Board {
     clear() {
         this.components = []
         this.wires = []
+        this.name = "Untitled Component"
     }
 
     hitTestComponents(pos: Vec2): Component | null {
@@ -283,7 +284,7 @@ export class Board {
         ctx.font = "10px caveat";
         ctx.textAlign = "center";
         ctx.textBaseline = "middle"
-        ctx.fillText("D Flip-Flop", this.size.x / 2, 10);
+        ctx.fillText(this.name, this.size.x / 2, 10);
     }
 
     drawWire(ctx: CanvasRenderingContext2D, fromPos: Vec2, toPos: Vec2, color: string) {

@@ -73,13 +73,24 @@
     </div>
   </div>
 
-  <div id="modal">
-    <div id="modalContent">
+  <div id="modal" class="modal">
+    <div id="modalContent" class="modalContent">
       <label id="modalLabel">Enter value:</label>
       <input type="text" id="modalInput" />
-      <div id="modalButtons">
+      <div id="modalButtons" class="modalButtons">
         <button id="modalOk">OK</button>
         <button id="modalCancel">Cancel</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="saveModal" class="modal">
+    <div id="modalContent" class="modalContent">
+      <label id="saveModalLabel">Enter value:</label>
+      <div id="modalButtons" class="modalButtons">
+        <button id="saveModalCancel">Cancel</button>
+        <button id="saveModalDiscard" class="danger">Discard</button>
+        <button id="saveModalSave" class="primary">Save</button>
       </div>
     </div>
   </div>

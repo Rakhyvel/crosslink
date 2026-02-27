@@ -3,6 +3,7 @@ import type { Sim } from "./sim";
 export class Palette {
     container: HTMLElement;
     sections: Map<string, HTMLElement>;
+    private items = new Map<string, HTMLElement>();
     sim: Sim
 
     constructor(containerId: string, sim: Sim) {
@@ -29,24 +30,48 @@ export class Palette {
     }
 
     addItem(sectionName: string, name: string, type: string) {
-        const section = this.sections.get(sectionName);
-        if (!section) return;
+        if(this.items.has(name)) return
 
-        const div = document.createElement("div");
-        div.className = "palette-item";
-        div.textContent = name;
-        div.dataset.type = type;
-        div.dataset.name = name;
+        const section = this.sections.get(sectionName)
+        if (!section) return
 
-        this.bindItem(div)
+        const row = document.createElement("div")
+        row.className = "palette-row"
 
-        section.appendChild(div);
+        const item = document.createElement("div")
+        item.className = "palette-item"
+        item.textContent = name
+        item.dataset.type = type
+        item.dataset.name = name
+
+        const editBtn = document.createElement("button")
+        editBtn.className = "palette-edit"
+        editBtn.innerHTML = "&#9998;"
+        editBtn.title = "Edit component"
+
+        editBtn.addEventListener("click", e => {
+            e.stopPropagation()
+            this.onEdit?.(name)
+        })
+
+        this.bindItem(item)
+
+        row.appendChild(item)
+        row.appendChild(editBtn)
+        section.appendChild(row)
+
+        this.items.set(name, row)
     }
 
     clearSection(sectionName: string) {
         const section = this.sections.get(sectionName);
         if (!section) return;
         section.innerHTML = "";
+    }
+
+    onEdit?(name: string) {
+        console.log("gonna edit " + name)
+        this.sim.load(name)
     }
 
     private bindItem(el: HTMLElement) {

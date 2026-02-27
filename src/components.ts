@@ -130,12 +130,7 @@ export abstract class Gate implements Component {
         const opacity = this.dragOffset ? "88" : "ff"
         const realPos = this.dragPos()
 
-        if (this.selected) {
-            ctx.fillStyle = "#4aa3ff" + opacity
-            ctx.beginPath();
-            ctx.fillRect(realPos.x - 2, realPos.y - 2, this.size.x + 4, this.size.y + 4);
-            ctx.fill();
-        }
+        this.drawSelection(ctx)
 
         // Draw box
         ctx.fillStyle = "#e9e9e9" + opacity;
@@ -154,6 +149,18 @@ export abstract class Gate implements Component {
         ctx.fillText(this.getLabel(), realPos.x + this.size.x / 2, realPos.y + this.size.y / 2);
 
         this.drawPorts(ctx)
+    }
+
+    drawSelection(ctx: CanvasRenderingContext2D) {
+        const opacity = this.dragOffset ? "88" : "ff"
+        const realPos = this.dragPos()
+
+        if (this.selected) {
+            ctx.fillStyle = "#4aa3ff" + opacity
+            ctx.beginPath();
+            ctx.fillRect(realPos.x - 2, realPos.y - 2, this.size.x + 4, this.size.y + 4);
+            ctx.fill();
+        }
     }
 
     drawPorts(ctx: CanvasRenderingContext2D) {
@@ -477,6 +484,8 @@ export class InputPin extends Gate implements MouseInteractable {
     }
 
     draw(ctx: CanvasRenderingContext2D) {
+        super.drawSelection(ctx)
+
         ctx.fillStyle = this.pressed ? "#2f28" : "#aaa";
         ctx.strokeStyle = "#757575ff";
         ctx.lineWidth = 0.5;
@@ -519,6 +528,8 @@ export class OutputPin extends Gate {
     update() { }
 
     draw(ctx: CanvasRenderingContext2D) {
+        super.drawSelection(ctx)
+        
         ctx.fillStyle = (this.inputs[0].value === 1) ? "#2f28" : "#aaa";
         ctx.strokeStyle = "#757575ff";
         ctx.lineWidth = 0.5;
@@ -577,6 +588,6 @@ export class CustomComponent extends Gate {
     }
 
     getLabel(): string {
-        return 'Custom'
+        return this.name
     }
 }
