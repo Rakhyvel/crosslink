@@ -70,6 +70,8 @@ window.addEventListener("keydown", async (e: KeyboardEvent) => {
             await sim.copySelected();
         } else if (e.key === "s") {
             await sim.save()
+        } else if (e.key === "g") {
+            await fetch("/api/health")
         } else if (e.key === "S") {
             await sim.saveAs()
         } else if (e.key.toLowerCase() === "v") {

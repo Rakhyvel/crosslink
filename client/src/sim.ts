@@ -71,7 +71,7 @@ export class Sim {
             this.cameraZoom *= e.deltaY < 0 ? zoomFactor : 1 / zoomFactor;
         })
 
-        this.board = new Board(BoardSize.Small, "Untitled Component")
+        this.board = new Board(BoardSize.Large, "Untitled Component")
     }
 
     worldFromScreen(screen: Vec2): Vec2 {
