@@ -158,13 +158,14 @@ h1 {
   background: #2a2d2e;
 }
 
-.palette-edit {
+.palette-edit,
+.palette-delete {
   opacity: 0;
   background: none;
   border: none;
   color: #888;
   cursor: pointer;
-  padding: 2px 6px;
+  padding: 2px 4px;
   font-size: 18px;
 }
 
@@ -172,7 +173,15 @@ h1 {
   opacity: 1;
 }
 
+.palette-row:hover .palette-delete {
+  opacity: 1;
+}
+
 .palette-edit:hover {
+  color: #fff;
+}
+
+.palette-delete:hover {
   color: #fff;
 }
 

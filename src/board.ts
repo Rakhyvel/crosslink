@@ -46,6 +46,7 @@ export class Board {
         for (const c of data.components) {
             const instance: Component | null = createComponentFromType(c.type, new Vec2(c.position.x, c.position.y), c.name, custom);
             if (!instance) {
+
                 throw "bad id: " + c.type
             }
 

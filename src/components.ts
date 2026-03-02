@@ -529,7 +529,7 @@ export class OutputPin extends Gate {
 
     draw(ctx: CanvasRenderingContext2D) {
         super.drawSelection(ctx)
-        
+
         ctx.fillStyle = (this.inputs[0].value === 1) ? "#2f28" : "#aaa";
         ctx.strokeStyle = "#757575ff";
         ctx.lineWidth = 0.5;
@@ -559,9 +559,9 @@ export class CustomComponent extends Gate {
         const inputs = data.components.filter(c => c.type === "InputPin")
         const outputs = data.components.filter(c => c.type === "OutputPin")
 
-        super(pos, name, inputs.map((_, i) => "in" + i), outputs.map((_, i) => "out" + i))
+        super(pos, "CustomComponent", inputs.map((_, i) => "in" + i), outputs.map((_, i) => "out" + i))
         this.name = name
-        this.board = Board.fromSerialized(data, custom)
+        this.board = Board.fromSerialized(data, name, custom)
     }
 
     clone() {

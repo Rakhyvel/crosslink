@@ -30,7 +30,7 @@ export class Palette {
     }
 
     addItem(sectionName: string, name: string, type: string) {
-        if(this.items.has(name)) return
+        if (this.items.has(name)) return
 
         const section = this.sections.get(sectionName)
         if (!section) return
@@ -48,16 +48,25 @@ export class Palette {
         editBtn.className = "palette-edit"
         editBtn.innerHTML = "&#9998;"
         editBtn.title = "Edit component"
-
         editBtn.addEventListener("click", e => {
             e.stopPropagation()
             this.onEdit?.(name)
+        })
+
+        const deleteBtn = document.createElement("button")
+        deleteBtn.className = "palette-delete"
+        deleteBtn.innerHTML = "&#10006;"
+        deleteBtn.title = "Edit component"
+        deleteBtn.addEventListener("click", e => {
+            e.stopPropagation()
+            this.onDelete?.(name)
         })
 
         this.bindItem(item)
 
         row.appendChild(item)
         row.appendChild(editBtn)
+        row.appendChild(deleteBtn)
         section.appendChild(row)
 
         this.items.set(name, row)
@@ -72,6 +81,17 @@ export class Palette {
     onEdit?(name: string) {
         console.log("gonna edit " + name)
         this.sim.load(name)
+    }
+
+    onDelete?(name: string) {
+        console.log("gonna delete " + name)
+
+        const row = this.items.get(name)
+        if (!row) return
+
+        row.remove()
+
+        this.items.delete(name)
     }
 
     private bindItem(el: HTMLElement) {
