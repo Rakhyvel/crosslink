@@ -11,10 +11,13 @@ export class History {
     private undoStack: Command[] = []
     private redoStack: Command[] = []
 
+    dirty: boolean = false
+
     execute(cmd: Command, sim: Sim) {
         cmd.do(sim)
         this.undoStack.push(cmd)
         this.redoStack = []
+        this.dirty = true
     }
 
     undo(sim: Sim) {

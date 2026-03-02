@@ -142,10 +142,10 @@ export class Sim {
 
     async clear() {
         this.enabled = false
-        
+
         const canProceed = await this.confirmDiscardIfDirty()
         if (!canProceed) return
-        
+
         this.board.clear()
         this.history.clear()
     }
@@ -315,7 +315,7 @@ export class Sim {
     }
 
     private async confirmDiscardIfDirty(): Promise<boolean> {
-        if (this.history.undoDepth() === 0) {
+        if (!this.history.dirty) {
             return true
         }
 
@@ -341,6 +341,7 @@ export class Sim {
         this.palette.addItem("Custom", name, "CustomComponent")
         this.board.name = name
         this.load(name)
+        this.history.dirty = false
     }
 
     startWireDrag(port: Port) {
