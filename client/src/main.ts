@@ -38,6 +38,7 @@ function frame() {
 }
 
 const sim = new Sim(canvas, 0.1)
+await sim.initializePalette()
 
 function getMousePos(e: MouseEvent): Vec2 {
     const rect = canvas.getBoundingClientRect()
@@ -70,8 +71,6 @@ window.addEventListener("keydown", async (e: KeyboardEvent) => {
             await sim.copySelected();
         } else if (e.key === "s") {
             await sim.save()
-        } else if (e.key === "g") {
-            await fetch("/api/health")
         } else if (e.key === "S") {
             await sim.saveAs()
         } else if (e.key.toLowerCase() === "v") {
@@ -129,6 +128,19 @@ slider.addEventListener("input", () => {
     const val = parseFloat(slider.value)
     const tickMs = sliderToTickMs(1.0 - val)
     sim.tickMs = tickMs
+})
+
+async function fetchComponents(user: string) {
+    const res = await fetch(`/api/components?user=${encodeURIComponent(user)}`)
+    if (!res.ok) {
+        throw new Error("Failed to fetch components")
+    }
+    const data = await res.json()
+    return data
+}
+
+fetchComponents("demo").then(components => {
+    console.log("demo components: ", components)
 })
 
 // Begin that splish

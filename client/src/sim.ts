@@ -1,9 +1,11 @@
 import { Port, PortKind, Wire, type Component, createComponentFromType } from './components.ts'
 import { Vec2 } from './vec.ts'
 import { AddComponentsCommand, AddWiresCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand, RemoveWiresCommand } from './command.ts'
-import { Board, BoardSize, type Serialized } from './board.ts'
+import { Board, BoardSize } from './board.ts'
 import { promptModal, confirmSaveModal } from './modal.ts'
 import { Palette } from './palette.ts'
+import { ComponentAPI } from './componentApi.ts'
+import type { Serialized } from 'shared'
 
 interface DraggingComponent {
     fromPos: Vec2
@@ -60,6 +62,8 @@ export class Sim {
 
     inModal: boolean = false
 
+    private api: ComponentAPI
+
     constructor(canvas: HTMLCanvasElement, tickMs: number) {
         this.canvas = canvas
         this.ctx = canvas.getContext("2d")!
@@ -72,6 +76,8 @@ export class Sim {
         })
 
         this.board = new Board(BoardSize.Large, "Untitled Component")
+
+        this.api = new ComponentAPI("demo")
     }
 
     worldFromScreen(screen: Vec2): Vec2 {
@@ -275,21 +281,21 @@ export class Sim {
 
     async save() {
         if (this.customComponents.has(this.board.name)) {
-            this.saveUnderName(this.board.name)
+            await this.saveUnderName(this.board.name)
             return
         }
 
         const name = await this.promptForName()
         if (!name) return
 
-        this.saveUnderName(name)
+        await this.saveUnderName(name)
     }
 
     async saveAs() {
         const name = await this.promptForName()
         if (!name) return
 
-        this.saveUnderName(name)
+        await this.saveUnderName(name)
     }
 
     async load(name: string) {
@@ -305,6 +311,27 @@ export class Sim {
 
         this.history.clear()
         this.board = Board.fromSerialized(data, name, this.customComponents)
+    }
+
+    async initializePalette() {
+        // Make sure we have the server data loaded
+        if (this.api) {
+            const components = await this.api.getAll()
+            for (const [name, data] of Object.entries(components)) {
+                this.customComponents.set(name, data as Serialized)
+            }
+        }
+
+        // Populate the palette with all custom components
+        for (const name of this.customComponents.keys()) {
+            this.palette.addItem("Custom", name, "CustomComponent")
+        }
+    }
+
+    async deleteLocalCustomComponent(name: string) {
+        if (this.api) {
+            await this.api.delete(name)
+        }
     }
 
     private async promptForName(): Promise<string | null> {
@@ -335,13 +362,15 @@ export class Sim {
         return false
     }
 
-    private saveUnderName(name: string) {
+    private async saveUnderName(name: string) {
         const data = this.board.serialize(_ => true)
         this.customComponents.set(name, data)
         this.palette.addItem("Custom", name, "CustomComponent")
         this.board.name = name
         this.load(name)
         this.history.dirty = false
+
+        await this.api.save(name, data)
     }
 
     startWireDrag(port: Port) {

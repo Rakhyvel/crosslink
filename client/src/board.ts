@@ -1,3 +1,4 @@
+import type { Serialized } from "shared";
 import { createComponentFromType, InputPin, PortKind, Wire, type Component, type MouseInteractable, type Port } from "./components"
 import { Vec2 } from "./vec"
 
@@ -7,21 +8,6 @@ export enum BoardSize {
     Small,
     Medium,
     Large
-}
-
-export type Serialized = {
-    components: {
-        id: string
-        type: string
-        name: string | undefined
-        position: { x: number, y: number }
-    }[]
-    wires: {
-        fromComponentId: string
-        fromPortIndex: number
-        toComponentId: string
-        toPortIndex: number
-    }[]
 }
 
 const boardSizes: Record<BoardSize, Vec2> = {

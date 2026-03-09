@@ -83,7 +83,7 @@ export class Palette {
         this.sim.load(name)
     }
 
-    onDelete?(name: string) {
+    async onDelete?(name: string) {
         console.log("gonna delete " + name)
 
         const row = this.items.get(name)
@@ -92,6 +92,7 @@ export class Palette {
         row.remove()
 
         this.items.delete(name)
+        await this.sim.deleteLocalCustomComponent(name)
     }
 
     private bindItem(el: HTMLElement) {
