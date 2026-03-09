@@ -1,11 +1,11 @@
 import { Port, PortKind, Wire, type Component, createComponentFromType } from './components.ts'
-import { Vec2 } from './vec.ts'
+import { Vec2 } from 'shared/src/vec.ts'
 import { AddComponentsCommand, AddWiresCommand, CompositeCommand, History, MoveComponentsCommand, RemoveComponentsCommand, RemoveWiresCommand } from './command.ts'
-import { Board, BoardSize } from './board.ts'
+import { Board } from './board.ts'
 import { promptModal, confirmSaveModal } from './modal.ts'
 import { Palette } from './palette.ts'
 import { ComponentAPI } from './componentApi.ts'
-import type { Serialized } from 'shared'
+import { BoardSize, type Serialized } from 'shared'
 
 interface DraggingComponent {
     fromPos: Vec2

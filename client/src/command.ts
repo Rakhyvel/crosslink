@@ -1,6 +1,6 @@
 import type { Component, Wire } from "./components"
 import { Sim } from "./sim"
-import type { Vec2 } from "./vec"
+import type { Vec2 } from "shared/src/vec"
 
 interface Command {
     do(sim: Sim): void

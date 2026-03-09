@@ -1,5 +1,5 @@
 import { Board, type Serialized } from './board.ts'
-import { Vec2 } from './vec.ts'
+import { Vec2 } from 'shared/src/vec.ts'
 
 export interface Component {
     pos: Vec2

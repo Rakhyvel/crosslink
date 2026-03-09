@@ -1,7 +1,7 @@
 import './style.css'
 
 import { Sim } from './sim.ts'
-import { Vec2 } from './vec.ts'
+import { Vec2 } from 'shared/src/vec.ts'
 
 const canvas = document.getElementById("sim-canvas") as HTMLCanvasElement
 
