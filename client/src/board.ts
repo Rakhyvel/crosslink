@@ -4,13 +4,15 @@ import { Vec2 } from "shared/src/vec"
 
 export class Board {
     size: Vec2
+    boardSize: BoardSize
 
     constructor(boardSize: BoardSize, public name: string, private components: Component[] = [], private wires: Wire[] = []) {
+        this.boardSize = boardSize
         this.size = boardSizes[boardSize]
     }
 
     static fromSerialized(data: Serialized, name: string, custom: Map<string, Serialized> | null = null): Board {
-        const retval = new Board(BoardSize.Small, name)
+        const retval = new Board(data.size, name)
 
         // Instantiate components and map old IDs -> new instances
         const idMap = new Map<string, Component>();
@@ -158,6 +160,7 @@ export class Board {
     serialize(f: (value: Component) => Boolean): Serialized {
         const components = this.components.filter(f)
         const data: Serialized = {
+            size: this.boardSize,
             components: [],
             wires: []
         };

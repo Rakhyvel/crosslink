@@ -1,4 +1,5 @@
-import { Board, type Serialized } from './board.ts'
+import type { Serialized } from 'shared'
+import { Board } from './board.ts'
 import { Vec2 } from 'shared/src/vec.ts'
 
 export interface Component {
@@ -556,8 +557,8 @@ export class CustomComponent extends Gate {
     board: Board
 
     constructor(pos: Vec2, name: string, private data: Serialized, private custom: Map<string, Serialized>) {
-        const inputs = data.components.filter(c => c.type === "InputPin")
-        const outputs = data.components.filter(c => c.type === "OutputPin")
+        const inputs = data.components.filter((c: { type: string }) => c.type === "InputPin")
+        const outputs = data.components.filter((c: { type: string }) => c.type === "OutputPin")
 
         super(pos, "CustomComponent", inputs.map((_, i) => "in" + i), outputs.map((_, i) => "out" + i))
         this.name = name

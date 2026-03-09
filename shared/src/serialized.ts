@@ -1,4 +1,7 @@
+import { BoardSize } from "./boardSize"
+
 export type Serialized = {
+    size: BoardSize
     components: {
         id: string
         type: string
